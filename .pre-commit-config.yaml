@@ -6,30 +6,35 @@ repos:
         exclude: ^extern/
       - id: end-of-file-fixer
         exclude: ^extern/
-      - id: check-yaml
       - id: check-added-large-files
         args: ['--maxkb=5000']
 
-  - repo: local
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v15.0.7
     hooks:
       - id: clang-format
-        name: clang-format
-        entry: bash -c 'CF=$(command -v clang-format-15 || command -v clang-format); $CF --style=file -i "$@"' --
-        language: system
-        files: ^(src|include|tests)/.*\.(cc|h|cpp|hpp)$
+        types_or: [c++, c, header]
         exclude: ^extern/
 
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
       - id: cmake-format
-        name: cmake-format
-        entry: cmake-format -i
-        language: python
-        additional_dependencies: [cmakelang]
-        files: (CMakeLists\.txt|\.cmake)$
         exclude: ^extern/
+
+  - repo: local
+    hooks:
+      - id: lizard
+        name: cyclomatic complexity (lizard)
+        entry: lizard src tests -C 15 -Werror
+        language: python
+        additional_dependencies: [lizard]
+        pass_filenames: false
+        always_run: true
 
       - id: cmake-configure
         name: cmake configure
-        entry: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        entry: bash -c "PREFIX=''; if [ -d '/usr/lib/x86_64-linux-gnu/cmake/Qt6' ]; then PREFIX='-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt6'; fi; cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON $PREFIX"
         language: system
         pass_filenames: false
         always_run: true
@@ -43,7 +48,7 @@ repos:
 
       - id: clang-tidy
         name: clang-tidy
-        entry: clang-tidy -p build --fix --quiet
+        entry: bash -c 'CT=$(command -v clang-tidy-15 || command -v clang-tidy); $CT -p build --fix --quiet "$@"' --
         language: system
         files: ^(src|tests)/.*\.(cc|cpp)$
         exclude: ^extern/
@@ -55,9 +60,24 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: generate-docs
+        name: generate documentation (doxygen)
+        entry: bash -c "if command -v doxygen >/dev/null; then cmake --build build --target doc; else echo 'Doxygen nieznaleziony, pomijam'; fi"
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: run-tests
         name: run tests
         entry: bash -c "cd build && if command -v xvfb-run >/dev/null; then xvfb-run --auto-servernum ctest --output-on-failure; else ctest --output-on-failure; fi"
         language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: code-coverage
+        name: code coverage (gcovr)
+        entry: gcovr -r . --exclude-throw-branches --exclude 'extern/.*' --print-summary
+        language: python
+        additional_dependencies: [gcovr]
         pass_filenames: false
         always_run: true
