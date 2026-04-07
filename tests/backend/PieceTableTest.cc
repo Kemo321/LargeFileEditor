@@ -17,17 +17,15 @@ class PieceTableTest : public ::testing::Test {
 protected:
     std::string tempFilePath_ = "test_piece_table_temp.txt";
 
-    void SetUp() override
+    [[maybe_unused]] void SetUp() override
     {
     }
 
-    void TearDown() override
+    [[maybe_unused]] void TearDown() override
     {
-        // Sprzątamy plik tymczasowy po każdym teście
         std::remove( tempFilePath_.c_str() );
     }
 
-    // Funkcja pomocnicza: Tworzy plik na dysku i zwraca jego ścieżkę
     auto createTempFile( const std::string& text ) -> std::string
     {
         std::ofstream out( tempFilePath_, std::ios::binary );
