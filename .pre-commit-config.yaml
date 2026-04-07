@@ -26,7 +26,7 @@ repos:
 
       - id: clang-tidy
         name: clang-tidy
-        entry: clang-tidy -p build --fix --quiet --allow-no-checks
+        entry: clang-tidy -p build --fix --quiet
         language: system
         files: \.(cc|cpp)$
         types_or: [c++]
