@@ -17,11 +17,11 @@ class PieceTableTest : public ::testing::Test {
 protected:
     std::string tempFilePath_ = "test_piece_table_temp.txt";
 
-    [[maybe_unused]] void SetUp() override
+    void SetUp() override
     {
     }
 
-    [[maybe_unused]] void TearDown() override
+    void TearDown() override
     {
         std::remove( tempFilePath_.c_str() );
     }

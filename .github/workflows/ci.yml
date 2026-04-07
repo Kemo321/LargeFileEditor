@@ -28,11 +28,11 @@ jobs:
 
       - name: Run Clang-Format Check
         run: |
-          find src include tests -type f \( -name "*.cc" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) | xargs clang-format-15 --style=file --dry-run --Werror
+          find src include tests -type f \( -name "*.cc" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty clang-format-15 --style=file --dry-run --Werror
 
       - name: Run CMake-Format Check
         run: |
-          find . -name "extern" -prune -o -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) -print | xargs cmake-format --check
+          find . -name "extern" -prune -o -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) -print | xargs --no-run-if-empty cmake-format --check
 
       - name: Configure CMake
         run: |
@@ -43,11 +43,11 @@ jobs:
 
       - name: Static Analysis (Cppcheck)
         run: |
-          cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/ tests/
+          cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/ tests/ --exclude=extern
 
       - name: Static Analysis (Clang-Tidy)
         run: |
-          find src tests -type f \( -name "*.cc" -o -name "*.cpp" \) | xargs clang-tidy -p build --quiet
+          find src tests -type f \( -name "*.cc" -o -name "*.cpp" \) | xargs --no-run-if-empty clang-tidy -p build --quiet
 
       - name: Complexity Check (Lizard)
         run: lizard src tests -C 15 -Werror
@@ -65,4 +65,4 @@ jobs:
 
       - name: Code Coverage Summary
         run: |
-          gcovr -r . --exclude-throw-branches --print-summary
+          gcovr -r . --exclude-throw-branches --exclude 'extern/.*' --print-summary
