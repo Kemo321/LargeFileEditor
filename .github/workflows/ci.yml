@@ -21,17 +21,18 @@ jobs:
           sudo apt update
           sudo apt install -y \
             build-essential cmake qt6-base-dev libgl1-mesa-dev \
-            libgtest-dev clang-format clang-tidy cppcheck xvfb
+            libgtest-dev clang-format-15 clang-tidy cppcheck xvfb doxygen
 
       - name: Install Python Tools
-        run: pip install gcovr
+        run: pip install gcovr cmakelang lizard
 
-      - name: Install Clang-Format
-        run: sudo apt-get install -y clang-format-15
-
-      - name: Run Formatting Check
+      - name: Run Clang-Format Check
         run: |
-          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format-15 --style=file --dry-run --Werror
+          find src include tests -type f \( -name "*.cc" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) | xargs clang-format-15 --style=file --dry-run --Werror
+
+      - name: Run CMake-Format Check
+        run: |
+          find . -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) | xargs cmake-format --check
 
       - name: Configure CMake
         run: |
@@ -42,16 +43,22 @@ jobs:
 
       - name: Static Analysis (Cppcheck)
         run: |
-          cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/
+          cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/ tests/
 
       - name: Static Analysis (Clang-Tidy)
         run: |
-          find src -name "*.cc" | xargs clang-tidy -p build --quiet
+          find src tests -type f \( -name "*.cc" -o -name "*.cpp" \) | xargs clang-tidy -p build --quiet
+
+      - name: Complexity Check (Lizard)
+        run: lizard src tests -C 15 -Werror
 
       - name: Build Project
         run: cmake --build build -j $(nproc)
 
-      - name: Run Tests (with Virtual Display)
+      - name: Generate Documentation (Doxygen)
+        run: cmake --build build --target doc
+
+      - name: Run Tests
         run: |
           cd build
           xvfb-run --auto-servernum ctest --output-on-failure

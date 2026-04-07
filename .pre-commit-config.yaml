@@ -8,15 +8,19 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=5000']
 
-  - repo: local
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v15.0.7
     hooks:
       - id: clang-format
-        name: clang-format
-        entry: clang-format -i --style=file
-        language: system
-        files: \.(cc|h|cpp|hpp)$
         types_or: [c++, c, header]
 
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+
+  - repo: local
+    hooks:
       - id: cppcheck
         name: cppcheck
         entry: cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/ tests/
@@ -31,32 +35,10 @@ repos:
         files: \.(cc|cpp)$
         types_or: [c++]
 
-      - id: cmake-format
-        name: cmake-format
-        entry: cmake-format -i
-        language: python
-        additional_dependencies: [cmakelang]
-        files: (CMakeLists\.txt|.*\.cmake)$
-
       - id: lizard
         name: cyclomatic complexity (lizard)
-        entry: lizard src -C 15 -Werror
+        entry: lizard src tests -C 15 -Werror
         language: python
         additional_dependencies: [lizard]
         types: [c++]
-        pass_filenames: false
-
-      - id: code-coverage
-        name: code coverage (gcovr)
-        entry: bash -c "cmake --build build -j $(nproc || sysctl -n hw.ncpu) && cd build && ctest --output-on-failure && gcovr -r .. --exclude-throw-branches"
-        language: python
-        additional_dependencies: [gcovr]
-        always_run: true
-        pass_filenames: false
-
-      - id: doxygen
-        name: generate documentation (doxygen)
-        entry: cmake --build build --target doc
-        language: system
-        always_run: true
         pass_filenames: false
