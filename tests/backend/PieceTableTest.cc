@@ -213,6 +213,7 @@ TEST_F( PieceTableTest, RemoveCompletelyEliminatingMultipleMiddlePieces )
     ASSERT_EQ( pieceTable.getText(), "StartABEnd" );
     pieceTable.insert( 7, "C" );  // StartABCEnd
     ASSERT_EQ( pieceTable.getText(), "StartABCEnd" );
+    EXPECT_EQ( pieceTable.getSubstr( 0, 11 ), "StartABCEnd" );
     // Delete across all middle pieces.
     pieceTable.remove( 4, 5 );  // Deletes "ABCEn"
     EXPECT_EQ( pieceTable.getText(), "Starnd" );
@@ -300,6 +301,7 @@ TEST_F( PieceTableTest, InsertMultipleTimesSequentiallyAtBeginning )
     pieceTable.insert( 0, "e" );
     pieceTable.insert( 0, "H" );
     EXPECT_EQ( pieceTable.getText(), "Hello" );
+    EXPECT_EQ( pieceTable.getSubstr( 1, 3 ), "ell" );
 }
 
 TEST_F( PieceTableTest, ComplexSpanningDeleteAcrossThreePieces )
@@ -307,6 +309,7 @@ TEST_F( PieceTableTest, ComplexSpanningDeleteAcrossThreePieces )
     PieceTable pieceTable( createTempFile( "123789" ) );
     // Create a middle piece then delete across pieces.
     pieceTable.insert( 3, "456" );
+    EXPECT_EQ( pieceTable.getSubstr( 0, 9 ), "123456789" );
     pieceTable.remove( 2, 5 );
     EXPECT_EQ( pieceTable.getText(), "1289" );
 }
@@ -318,6 +321,7 @@ TEST_F( PieceTableTest, DeleteLeavingEmptyPieces )
     pieceTable.insert( 3, "XYZ" );
     pieceTable.remove( 3, 3 );
     EXPECT_EQ( pieceTable.getText(), "ABCDEF" );
+    EXPECT_EQ( pieceTable.getSubstr( 0, 6 ), "ABCDEF" );
     EXPECT_EQ( pieceTable.size(), 6 );
 }
 
@@ -336,8 +340,10 @@ TEST_F( PieceTableTest, ComplexCaseOfMultipleInsertsAndDeletes )
     EXPECT_EQ( pieceTable.getText(), "brown cat sly lazy dog." );
     pieceTable.remove( pieceTable.size() - 1, 1 );  // Remove "."
     EXPECT_EQ( pieceTable.getText(), "brown cat sly lazy dog" );
-    pieceTable.insert( pieceTable.size(), "!" );  // Insert "!" at the end
+    EXPECT_EQ( pieceTable.getSubstr( 6, 3 ), "cat" );  // Test getSubstr
+    pieceTable.insert( pieceTable.size(), "!" );       // Insert "!" at the end
     EXPECT_EQ( pieceTable.getText(), "brown cat sly lazy dog!" );
+    EXPECT_EQ( pieceTable.getSubstr( 6, 3 ), "cat" );  // Test getSubstr
 }
 
 // NOLINTEND(readability-magic-numbers)

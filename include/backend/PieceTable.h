@@ -63,6 +63,14 @@ public:
     [[nodiscard]] auto getText() const -> std::string;
 
     /**
+     * @brief Retrieves a fragment of the document without copying the entire file.
+     * @param position Starting logical position.
+     * @param length Number of characters to retrieve.
+     * @return A string containing only the requested part.
+     */
+    [[nodiscard]] auto getSubstr( uint64_t position, uint64_t length ) const -> std::string;
+
+    /**
      * @brief Inserts new text at the given position.
      */
     auto insert( uint64_t position, const std::string& text ) -> void;

@@ -90,6 +90,36 @@ auto PieceTable::getText() const -> std::string
     return result;
 }
 
+auto PieceTable::getSubstr( uint64_t position, uint64_t length ) const -> std::string
+{
+    if( position + length > size() ) {
+        throw std::out_of_range( "Substring range out of bounds" );
+    }
+
+    std::string result;
+    result.reserve( length );
+
+    auto [index, offset] = findPieceAt( position );
+    uint64_t remaining = length;
+
+    while( remaining > 0 && index < pieces_.size() ) {
+        const Piece& piece = pieces_[index];
+        uint64_t availableInPiece = piece.length_ - offset;
+        uint64_t toCopy = std::min( remaining, availableInPiece );
+
+        const char* bufferPtr =
+            ( piece.type_ == BufferType::Original ) ? originalBuffer_ : addBuffer_.data();
+
+        result.append( bufferPtr + piece.start_ + offset, toCopy );
+
+        remaining -= toCopy;
+        offset = 0;
+        index++;
+    }
+
+    return result;
+}
+
 auto PieceTable::findPieceAt( uint64_t position ) const -> FindResult
 {
     uint64_t currentPos = 0;
