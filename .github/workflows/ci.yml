@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Formatting Check (Clang-Format)
         run: |
-          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format --dry-run --Werror
+          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format --style=file --dry-run --Werror
 
       - name: Configure CMake
         run: |
