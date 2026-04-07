@@ -3,60 +3,82 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^extern/
       - id: end-of-file-fixer
-      - id: check-yaml
+        exclude: ^extern/
       - id: check-added-large-files
         args: ['--maxkb=5000']
 
-  - repo: local
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v15.0.7
     hooks:
       - id: clang-format
-        name: clang-format
-        entry: clang-format -i --style=file
-        language: system
-        files: \.(cc|h|cpp|hpp)$
+        args: [-i, --style=file]
         types_or: [c++, c, header]
+        exclude: ^extern/
+
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+        exclude: ^extern/
+
+  - repo: local
+    hooks:
+      - id: lizard
+        name: cyclomatic complexity (lizard)
+        entry: lizard src tests -C 15 -Werror
+        language: python
+        additional_dependencies: [lizard]
+        pass_filenames: false
+        always_run: true
+
+      - id: cmake-configure
+        name: cmake configure
+        entry: bash -c "PREFIX=''; if [ -d '/usr/lib/x86_64-linux-gnu/cmake/Qt6' ]; then PREFIX='-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt6'; fi; cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON $PREFIX"
+        language: system
+        pass_filenames: false
+        always_run: true
 
       - id: cppcheck
         name: cppcheck
-        entry: cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/
+        entry: cppcheck --enable=all --inline-suppr --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/ tests/ -i extern/ --suppress=unusedFunction:tests/* --suppress=unmatchedSuppression
         language: system
-        types: [c++]
         pass_filenames: false
+        always_run: true
 
       - id: clang-tidy
         name: clang-tidy
-        entry: clang-tidy -p build --fix --quiet
+        entry: bash -c 'CT=$(command -v clang-tidy-15 || command -v clang-tidy); $CT -p build --fix --quiet "$@"' --
         language: system
-        files: \.(cc|cpp)$
-        types_or: [c++]
+        files: ^(src|tests)/.*\.(cc|cpp)$
+        exclude: ^extern/
 
-      - id: cmake-format
-        name: cmake-format
-        entry: cmake-format -i
-        language: python
-        additional_dependencies: [cmakelang]
-        files: (CMakeLists\.txt|.*\.cmake)$
-
-      - id: lizard
-        name: cyclomatic complexity (lizard)
-        entry: lizard src -C 15 -Werror
-        language: python
-        additional_dependencies: [lizard]
-        types: [c++]
+      - id: build-project
+        name: build project
+        entry: cmake --build build -j 4
+        language: system
         pass_filenames: false
+        always_run: true
+
+      - id: generate-docs
+        name: generate documentation (doxygen)
+        entry: bash -c "if command -v doxygen >/dev/null; then cmake --build build --target doc; else echo 'Doxygen nieznaleziony, pomijam'; fi"
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: run-tests
+        name: run tests
+        entry: bash -c "cd build && if command -v xvfb-run >/dev/null; then xvfb-run --auto-servernum ctest --output-on-failure; else ctest --output-on-failure; fi"
+        language: system
+        pass_filenames: false
+        always_run: true
 
       - id: code-coverage
         name: code coverage (gcovr)
-        entry: bash -c "cmake --build build -j $(nproc || sysctl -n hw.ncpu) && cd build && ctest --output-on-failure && gcovr -r .. --exclude-throw-branches"
+        entry: gcovr -r . --exclude-throw-branches --exclude 'extern/.*' --print-summary
         language: python
         additional_dependencies: [gcovr]
-        always_run: true
         pass_filenames: false
-
-      - id: doxygen
-        name: generate documentation (doxygen)
-        entry: cmake --build build --target doc
-        language: system
         always_run: true
-        pass_filenames: false

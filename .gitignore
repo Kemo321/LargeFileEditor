@@ -70,3 +70,10 @@ cmake-build-*/
 *.log
 *.tmp
 *.bak
+
+coverage.css
+coverage.functions.html
+coverage.html
+coverage.js
+
+*.py
