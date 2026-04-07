@@ -17,7 +17,7 @@ class PieceTableTest : public ::testing::Test {
 protected:
     std::string tempFilePath_ = "test_piece_table_temp.txt";
 
-    // clang-format off
+    // cppcheck-suppress unusedFunction
     void SetUp() override
     {
     }
@@ -27,7 +27,7 @@ protected:
         std::remove( tempFilePath_.c_str() );
     }
 
-    // clang-format on
+    // cppcheck-suppress unusedFunction
 
     auto createTempFile( const std::string& text ) -> std::string
     {
