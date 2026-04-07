@@ -26,9 +26,12 @@ jobs:
       - name: Install Python Tools
         run: pip install gcovr
 
-      - name: Run Formatting Check (Clang-Format)
+      - name: Install Clang-Format
+        run: sudo apt-get install -y clang-format-15
+
+      - name: Run Formatting Check
         run: |
-          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format --style=file --dry-run --Werror
+          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format-15 --style=file --dry-run --Werror
 
       - name: Configure CMake
         run: |
@@ -43,8 +46,6 @@ jobs:
 
       - name: Static Analysis (Clang-Tidy)
         run: |
-          # Wykorzystujemy bazę JSON wygenerowaną przez CMake
-          # Sprawdzamy tylko pliki źródłowe .cc
           find src -name "*.cc" | xargs clang-tidy -p build --quiet
 
       - name: Build Project
