@@ -48,7 +48,7 @@ repos:
 
       - id: code-coverage
         name: code coverage (gcovr)
-        entry: bash -c "cd build && ctest --output-on-failure && gcovr -r .. --exclude-throw-branches"
+        entry: bash -c "cmake --build build -j $(nproc || sysctl -n hw.ncpu) && cd build && ctest --output-on-failure && gcovr -r .. --exclude-throw-branches"
         language: python
         additional_dependencies: [gcovr]
         always_run: true
