@@ -39,7 +39,7 @@ auto PieceTable::openMmap( const std::string& filePath ) -> void
         return;
     }
 
-    struct stat sb{};
+    struct stat sb {};
     if( fstat( fileDescriptor_, &sb ) == -1 ) {
         return;
     }
