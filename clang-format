@@ -1,0 +1,48 @@
+Language: Cpp
+BasedOnStyle: Google
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: true
+AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# Indentation according to ZPR (4 spaces)
+IndentWidth: 4
+ColumnLimit: 100
+TabWidth: 4
+UseTab: Never
+
+# Spaces in parentheses - key in the instructor's example: if( wyr )
+SpacesInParentheses: true
+BracketAlignmentStyle: Custom
+ControlStatementStyle: Custom
+
+# Brace formatting
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: false
+  BeforeElse: false
+  SplitEmptyFunction: true
+
+# Spaces around operators and parentheses
+SpaceBeforeParens: Never
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInContainerLiterals: true
+
+# Pointers: int* ptr_ (ZPR often prefers next to the type)
+PointerAlignment: Left
+
+# Sorting includes (alphabetically)
+SortIncludes: true
+
+# Additional rules specific to C++23
+Standard: c++23
