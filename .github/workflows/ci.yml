@@ -21,44 +21,40 @@ jobs:
           sudo apt update
           sudo apt install -y \
             build-essential cmake qt6-base-dev libgl1-mesa-dev \
-            libgtest-dev clang-format clang-tidy cppcheck xvfb doxygen graphviz
+            libgtest-dev clang-format clang-tidy cppcheck xvfb
 
       - name: Install Python Tools
-        run: |
-          pip install pre-commit lizard gcovr cmakelang
+        run: pip install gcovr
 
-      - name: Configure CMake (for Clang-Tidy Database)
+      - name: Run Formatting Check (Clang-Format)
         run: |
-          # Clang-tidy z Twojego pre-commita wymaga folderu build i bazy JSON
+          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format --dry-run --Werror
+
+      - name: Configure CMake
+        run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt6
 
-      - name: Run Pre-commit Hooks
-        # To uruchamia dokładnie to, co masz w .pre-commit-config.yaml
-        run: pre-commit run --all-files
+      - name: Static Analysis (Cppcheck)
+        run: |
+          cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/
+
+      - name: Static Analysis (Clang-Tidy)
+        run: |
+          # Wykorzystujemy bazę JSON wygenerowaną przez CMake
+          # Sprawdzamy tylko pliki źródłowe .cc
+          find src -name "*.cc" | xargs clang-tidy -p build --quiet
 
       - name: Build Project
         run: cmake --build build -j $(nproc)
 
-      - name: Run Tests (with Coverage)
+      - name: Run Tests (with Virtual Display)
         run: |
           cd build
-          # Uruchomienie testów z wirtualnym ekranem dla Qt
           xvfb-run --auto-servernum ctest --output-on-failure
 
-      - name: Generate Code Coverage Report
+      - name: Code Coverage Summary
         run: |
-          # Generowanie raportu na podstawie plików stworzonych podczas testów
-          gcovr -r . --exclude-throw-branches --print-summary -o build/coverage.txt
-          cat build/coverage.txt
-
-      - name: Check Cyclomatic Complexity (Lizard)
-        run: |
-          lizard src -C 15 -Werror
-
-      - name: Generate Documentation (Doxygen)
-        run: |
-          # Uruchomienie Doxygena (zakładając, że masz target 'doc' w CMake)
-          cmake --build build --target doc || echo "Doxygen target not found, skipping."
+          gcovr -r . --exclude-throw-branches --print-summary

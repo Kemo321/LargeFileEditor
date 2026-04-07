@@ -17,7 +17,7 @@
 // cppcheck-suppress uninitMemberVar
 PieceTable::PieceTable() = default;
 
-// Konstruktor przyjmujący ŚCIEŻKĘ DO PLIKU, a nie zawartość tekstu
+// Constructor accepting FILE PATH, not text content
 // cppcheck-suppress uninitMemberVar
 PieceTable::PieceTable( const std::string& filePath )
 {
@@ -46,7 +46,7 @@ auto PieceTable::openMmap( const std::string& filePath ) -> void
 
     mmapSize_ = static_cast<uint64_t>( sb.st_size );
 
-    // Mapowanie pliku bezpośrednio do przestrzeni adresowej procesu
+    // Map the file directly into the process address space
     originalBuffer_ = static_cast<const char*>(
         mmap( nullptr, mmapSize_, PROT_READ, MAP_SHARED, fileDescriptor_, 0 ) );
 }
@@ -77,12 +77,12 @@ auto PieceTable::getText() const -> std::string
 
     for( const auto& piece : pieces_ ) {
         if( piece.type_ == BufferType::Original ) {
-            // Bezpośredni odczyt z pamięci zmapowanej (wskaźnik + offset)
+            // Direct read from mapped memory (pointer + offset)
             if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr ) {
                 result.append( originalBuffer_ + piece.start_, piece.length_ );
             }
         } else {
-            // Odczyt z bufora w RAM (std::string)
+            // Read from RAM buffer (std::string)
             result.append( addBuffer_.data() + piece.start_, piece.length_ );
         }
     }
@@ -101,7 +101,7 @@ auto PieceTable::findPieceAt( uint64_t position ) const -> FindResult
         currentPos += pieces_[i].length_;
     }
 
-    // Jeśli wstawiamy idealnie na końcu dokumentu
+    // If inserting exactly at the end of the document
     if( position == currentPos ) {
         return { pieces_.size(), 0 };
     }
@@ -134,17 +134,17 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
         throw std::out_of_range( "Insert out of range" );
     }
 
-    // 1. Zawsze dodajemy nowy tekst do addBuffer_
+    // 1. Always append new text to addBuffer_
     const auto startInAdd = static_cast<uint64_t>( addBuffer_.length() );
     addBuffer_.append( text );
     const auto textLength = static_cast<uint64_t>( text.length() );
 
-    // 2. Wstawianie węzła
+    // 2. Insert piece node
     if( position == currentSize ) {
-        // Wstawianie na samym końcu - po prostu dodajemy nowy Piece
+        // Inserting at the very end - just add a new Piece
         pieces_.push_back( { BufferType::Add, startInAdd, textLength } );
     } else {
-        // Wstawianie w środku - szukamy miejsca i ewentualnie dzielimy Piece
+        // Inserting in the middle - find position and split Piece if needed
         auto res = findPieceAt( position );
         if( res.offsetInPiece_ > 0 ) {
             splitPiece( res.pieceIndex_, res.offsetInPiece_ );
@@ -164,20 +164,20 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
         throw std::out_of_range( "Remove out of range" );
     }
 
-    // Najpierw dzielimy na końcu zakresu, aby indeksy startowe się nie rozjechały
+    // First split at the end of the range so start indices stay valid
     auto endRes = findPieceAt( position + length );
     if( endRes.pieceIndex_ < pieces_.size() && endRes.offsetInPiece_ > 0 ) {
         splitPiece( endRes.pieceIndex_, endRes.offsetInPiece_ );
     }
 
-    // Potem dzielimy na początku zakresu
+    // Then split at the start of the range
     auto startRes = findPieceAt( position );
     if( startRes.offsetInPiece_ > 0 ) {
         splitPiece( startRes.pieceIndex_, startRes.offsetInPiece_ );
         startRes.pieceIndex_++;
     }
 
-    // Na koniec usuwamy wszystkie "Pieces", które znalazły się całkowicie wewnątrz zakresu
+    // Finally remove all Pieces fully contained within the range
     uint64_t removedSoFar = 0;
     auto it = pieces_.begin() + startRes.pieceIndex_;
 
