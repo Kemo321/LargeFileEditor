@@ -37,3 +37,26 @@ repos:
         language: python
         additional_dependencies: [cmakelang]
         files: (CMakeLists\.txt|.*\.cmake)$
+
+      - id: lizard
+        name: cyclomatic complexity (lizard)
+        entry: lizard src -C 15 -Werror
+        language: python
+        additional_dependencies: [lizard]
+        types: [c++]
+        pass_filenames: false
+
+      - id: code-coverage
+        name: code coverage (gcovr)
+        entry: bash -c "cd build && ctest --output-on-failure && gcovr -r .. --exclude-throw-branches"
+        language: python
+        additional_dependencies: [gcovr]
+        always_run: true
+        pass_filenames: false
+
+      - id: doxygen
+        name: generate documentation (doxygen)
+        entry: cmake --build build --target doc
+        language: system
+        always_run: true
+        pass_filenames: false

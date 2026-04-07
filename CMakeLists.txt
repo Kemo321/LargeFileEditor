@@ -34,3 +34,20 @@ add_subdirectory(extern/googletest)
 
 enable_testing()
 add_subdirectory(tests)
+
+# Doxygen Documentation
+find_package(Doxygen)
+
+if(DOXYGEN_FOUND)
+  set(DOXYGEN_INPUT_DIR ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/include)
+  set(DOXYGEN_OUTPUT_DIR ${CMAKE_BINARY_DIR}/docs)
+
+  doxygen_add_docs(
+    doc ${DOXYGEN_INPUT_DIR} ALL
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Generating API documentation with Doxygen")
+
+  message(STATUS "Doxygen found. Target 'doc' is available.")
+else()
+  message(WARNING "Doxygen not found. Target 'doc' will not be created.")
+endif()
