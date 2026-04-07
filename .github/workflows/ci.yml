@@ -32,7 +32,7 @@ jobs:
 
       - name: Run CMake-Format Check
         run: |
-          find . -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) | xargs cmake-format --check
+          find . -name "extern" -prune -o -type f \( -name "CMakeLists.txt" -o -name "*.cmake" \) -print | xargs cmake-format --check
 
       - name: Configure CMake
         run: |
