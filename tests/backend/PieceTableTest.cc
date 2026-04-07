@@ -22,12 +22,11 @@ protected:
     {
     }
 
+    // cppcheck-suppress unusedFunction
     void TearDown() override
     {
         std::remove( tempFilePath_.c_str() );
     }
-
-    // cppcheck-suppress unusedFunction
 
     auto createTempFile( const std::string& text ) -> std::string
     {
