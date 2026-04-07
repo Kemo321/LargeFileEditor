@@ -9,12 +9,12 @@
 
 using namespace std;
 
-int main( int argc, char* argv[] )
+auto main( int argc, char* argv[] ) -> int
 {
     QApplication app( argc, argv );
 
     MainWindow main_window;
     main_window.show();
 
-    return app.exec();
+    return QApplication::exec();
 }

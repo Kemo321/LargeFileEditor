@@ -16,40 +16,49 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt update
           sudo apt install -y \
-            build-essential \
-            cmake \
-            qt6-base-dev \
-            libgl1-mesa-dev \
-            libgtest-dev \
-            clang-format \
-            cppcheck \
-            xvfb # Wirtualny serwer wyświetlania dla testów GUI
+            build-essential cmake qt6-base-dev libgl1-mesa-dev \
+            libgtest-dev clang-format clang-tidy cppcheck xvfb doxygen graphviz
 
-      - name: Run Clang-Format Check
+      - name: Install Python Tools
         run: |
-          # Sprawdza czy pliki są zgodne z .clang-format bez ich modyfikacji
-          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format --dry-run --Werror
+          pip install pre-commit lizard gcovr cmakelang
 
-      - name: Run Cppcheck
+      - name: Configure CMake (for Clang-Tidy Database)
         run: |
-          cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/
-
-      - name: Configure CMake
-        run: |
-          mkdir build
+          # Clang-tidy z Twojego pre-commita wymaga folderu build i bazy JSON
           cmake -S . -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt6
+
+      - name: Run Pre-commit Hooks
+        # To uruchamia dokładnie to, co masz w .pre-commit-config.yaml
+        run: pre-commit run --all-files
 
       - name: Build Project
-        run: cmake --build build --config Release -j $(nproc)
+        run: cmake --build build -j $(nproc)
 
-      - name: Run Tests
+      - name: Run Tests (with Coverage)
         run: |
           cd build
-          # xvfb-run pozwala testom Qt na start "udając" obecność monitora
+          # Uruchomienie testów z wirtualnym ekranem dla Qt
           xvfb-run --auto-servernum ctest --output-on-failure
+
+      - name: Generate Code Coverage Report
+        run: |
+          # Generowanie raportu na podstawie plików stworzonych podczas testów
+          gcovr -r . --exclude-throw-branches --print-summary -o build/coverage.txt
+          cat build/coverage.txt
+
+      - name: Check Cyclomatic Complexity (Lizard)
+        run: |
+          lizard src -C 15 -Werror
+
+      - name: Generate Documentation (Doxygen)
+        run: |
+          # Uruchomienie Doxygena (zakładając, że masz target 'doc' w CMake)
+          cmake --build build --target doc || echo "Doxygen target not found, skipping."
