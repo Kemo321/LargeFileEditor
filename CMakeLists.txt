@@ -51,3 +51,8 @@ if(DOXYGEN_FOUND)
 else()
   message(WARNING "Doxygen not found. Target 'doc' will not be created.")
 endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_options(--coverage)
+  add_link_options(--coverage)
+endif()
