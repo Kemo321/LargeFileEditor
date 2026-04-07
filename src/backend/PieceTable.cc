@@ -7,11 +7,9 @@
 
 using namespace std;
 
-PieceTable::PieceTable() : size_( 0 )
-{
-}
+PieceTable::PieceTable() = default;
 
-uint64_t PieceTable::getSize() const
+auto PieceTable::getSize() const -> uint64_t
 {
     return size_;
 }

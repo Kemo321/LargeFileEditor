@@ -1,0 +1,11 @@
+Checks: 'bugprone-*,modernize-*,performance-*,readability-*,cppcoreguidelines-active-member-init,cppcoreguidelines-pro-type-member-init'
+
+WarningsAsErrors: ''
+HeaderFilterRegex: 'include/.*'
+CheckOptions:
+  - key:             readability-identifier-naming.ClassCase
+    value:           PascalCase
+  - key:             readability-identifier-naming.FunctionCase
+    value:           camelCase
+  - key:             readability-identifier-naming.MemberSuffix
+    value:           _

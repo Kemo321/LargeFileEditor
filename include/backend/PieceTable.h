@@ -11,11 +11,11 @@
 class PieceTable {
 public:
     PieceTable();
-    uint64_t getSize() const;
+    [[nodiscard]] auto getSize() const -> uint64_t;
     void addSize( uint64_t amount );
 
 private:
-    uint64_t size_;
+    uint64_t size_{ 0 };
 };
 
 #endif

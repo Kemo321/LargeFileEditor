@@ -22,6 +22,4 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent )
     setCentralWidget( status_label_ );
 }
 
-MainWindow::~MainWindow()
-{
-}
+MainWindow::~MainWindow() = default;
