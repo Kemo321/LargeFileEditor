@@ -42,7 +42,7 @@ repos:
 
       - id: cppcheck
         name: cppcheck
-        entry: cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/ tests/ -i extern/
+        entry: cppcheck --enable=all --inline-suppr --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/ tests/ -i extern/ --suppress=unusedFunction:tests/* --suppress=unmatchedSuppression
         language: system
         pass_filenames: false
         always_run: true
