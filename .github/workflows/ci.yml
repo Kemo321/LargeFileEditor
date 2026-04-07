@@ -1,0 +1,55 @@
+name: C++ CI (Ubuntu 24.04)
+
+on:
+  push:
+    branches: [ main, master, dev, ci-and-tools ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential \
+            cmake \
+            qt6-base-dev \
+            libgl1-mesa-dev \
+            libgtest-dev \
+            clang-format \
+            cppcheck \
+            xvfb # Wirtualny serwer wyświetlania dla testów GUI
+
+      - name: Run Clang-Format Check
+        run: |
+          # Sprawdza czy pliki są zgodne z .clang-format bez ich modyfikacji
+          find src include tests -name "*.cc" -o -name "*.h" | xargs clang-format --dry-run --Werror
+
+      - name: Run Cppcheck
+        run: |
+          cppcheck --enable=all --suppressions-list=.cppcheck_suppressions --error-exitcode=1 -I include/ src/
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build Project
+        run: cmake --build build --config Release -j $(nproc)
+
+      - name: Run Tests
+        run: |
+          cd build
+          # xvfb-run pozwala testom Qt na start "udając" obecność monitora
+          xvfb-run --auto-servernum ctest --output-on-failure
