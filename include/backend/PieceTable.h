@@ -1,21 +1,103 @@
 /**
  * Authors: Tomasz Okon
- * Description: Header of the logic layer (backend).
+ * Description: Header of the logic layer (backend) - Piece Table implementation.
  */
 
-#ifndef PIECETABLE_H
-#define PIECETABLE_H
+#pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
+/**
+ * @brief A data structure for zero-copy, efficient editing of large texts.
+ */
 class PieceTable {
 public:
+    /**
+     * @brief Identifies which buffer a piece refers to.
+     */
+    enum class BufferType { Original, Add };
+
+    /**
+     * @brief Represents a fragment of the document.
+     */
+    struct Piece {
+        BufferType type_;
+        uint64_t start_;
+        uint64_t length_;
+    };
+
+    /**
+     * @brief Default constructor creating an empty document.
+     */
     PieceTable();
-    [[nodiscard]] auto getSize() const -> uint64_t;
-    void addSize( uint64_t amount );
+
+    /**
+     * @brief Constructor initializing the table by mapping a file from disk.
+     * @param filePath Path to the file to be memory-mapped.
+     */
+    explicit PieceTable( const std::string& filePath );
+
+    /**
+     * @brief Destructor ensuring proper unmapping of the file and closing descriptors.
+     */
+    ~PieceTable();
+
+    // Disable copy semantics to prevent double unmapping of the same file descriptor
+    PieceTable( const PieceTable& ) = delete;
+    auto operator=( const PieceTable& ) -> PieceTable& = delete;
+
+    // Enable move semantics (optional, but recommended for modern C++)
+    PieceTable( PieceTable&& ) noexcept = default;
+    auto operator=( PieceTable&& ) noexcept -> PieceTable& = default;
+
+    /**
+     * @brief Returns the total document size in characters.
+     */
+    [[nodiscard]] auto size() const -> uint64_t;
+
+    /**
+     * @brief Retrieves the entire current document content.
+     */
+    [[nodiscard]] auto getText() const -> std::string;
+
+    /**
+     * @brief Inserts new text at the given position.
+     */
+    auto insert( uint64_t position, const std::string& text ) -> void;
+
+    /**
+     * @brief Removes a fragment of text from the document.
+     */
+    auto remove( uint64_t position, uint64_t length ) -> void;
+
+    /**
+     * @brief Saves the current document state to a file.
+     * @param filePath Path where the file should be saved.
+     * @return True if successful.
+     */
+    [[nodiscard]] auto saveToFile( const std::string& filePath ) const -> bool;
 
 private:
-    uint64_t size_{ 0 };
-};
+    /**
+     * @brief Result of finding a piece at a specific logical position.
+     */
+    struct FindResult {
+        size_t pieceIndex_;
+        uint64_t offsetInPiece_;
+    };
 
-#endif
+    [[nodiscard]] auto findPieceAt( uint64_t position ) const -> FindResult;
+    auto splitPiece( size_t pieceIndex, uint64_t offset ) -> void;
+
+    auto openMmap( const std::string& filePath ) -> void;
+    auto closeMmap() -> void;
+
+    const char* originalBuffer_{ nullptr };
+    uint64_t mmapSize_{ 0 };
+    int fileDescriptor_{ -1 };
+
+    std::string addBuffer_;
+    std::vector<Piece> pieces_;
+};
