@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <fstream>
 #include <numeric>
 #include <stdexcept>
 #include <utility>
@@ -215,4 +216,24 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
         removedSoFar += it->length_;
         it = pieces_.erase( it );
     }
+}
+
+auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
+{
+    std::ofstream outFile( filePath, std::ios::binary );
+    if( !outFile.is_open() ) {
+        return false;
+    }
+
+    for( const auto& piece : pieces_ ) {
+        const char* bufferPtr =
+            ( piece.type_ == BufferType::Original ) ? originalBuffer_ : addBuffer_.data();
+
+        if( bufferPtr != nullptr && bufferPtr != MAP_FAILED ) {
+            outFile.write( bufferPtr + piece.start_,
+                           static_cast<std::streamsize>( piece.length_ ) );
+        }
+    }
+
+    return outFile.good();
 }
