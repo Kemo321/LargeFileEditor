@@ -89,10 +89,11 @@ public:
     [[nodiscard]] auto getSubstr( uint64_t position, uint64_t length ) const -> std::string;
 
     /**
-     * @brief For a given logical range, returns which parts come from Original and which from Add buffer.
-     * Useful for syntax highlighting or specialized rendering in the GUI.
+     * @brief For a given logical range, returns which parts come from Original and which from Add
+     * buffer. Useful for syntax highlighting or specialized rendering in the GUI.
      */
-    [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const -> std::vector<Piece>;
+    [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const
+        -> std::vector<Piece>;
 
     /**
      * @brief Inserts new text at the given position.
@@ -126,17 +127,24 @@ public:
     /**
      * @brief Checks if there are any actions available to undo.
      */
-    [[nodiscard]] auto canUndo() const -> bool { return !undoStack_.empty(); }
+    [[nodiscard]] auto canUndo() const -> bool
+    {
+        return !undoStack_.empty();
+    }
 
     /**
      * @brief Checks if there are any actions available to redo.
      */
-    [[nodiscard]] auto canRedo() const -> bool { return !redoStack_.empty(); }
+    [[nodiscard]] auto canRedo() const -> bool
+    {
+        return !redoStack_.empty();
+    }
 
     /**
      * @brief Checks if the document has been modified since the last save.
      */
-    [[nodiscard]] auto isDirty() const -> bool {
+    [[nodiscard]] auto isDirty() const -> bool
+    {
         return undoStack_.size() != lastSavedUndoSize_;
     }
 
@@ -153,7 +161,7 @@ private:
     [[nodiscard]] static auto computeLPS( const std::string& pattern ) -> std::vector<int>;
 
     /** * @brief Stacks for storing the state of the piece vector.
-     * We store only the vector of Pieces (pointers), which makes snapshots 
+     * We store only the vector of Pieces (pointers), which makes snapshots
      * extremely memory-efficient even for massive files.
      */
     std::vector<std::vector<Piece>> undoStack_;
@@ -186,6 +194,6 @@ private:
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
-    bool isBatchOperation_{false};
+    bool isBatchOperation_{ false };
     uint64_t lastSavedUndoSize_{ 0 };
 };
