@@ -5,6 +5,7 @@
 
 #include "gui/LargeFileViewer.h"
 
+#include <QCursor>
 #include <QPainter>
 #include <QScrollBar>
 #include <QStyle>

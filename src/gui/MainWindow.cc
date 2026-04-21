@@ -26,7 +26,7 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     createMenus();
     createStatusBar();
 
-    // Show asterik right away and mock highlitghts
+    // Show asterisk right away and mock highlights
     setWindowModified( true );
     viewer_->setMockHighlights( QStringList{ "dolore", "culpa" } );
 
@@ -148,7 +148,9 @@ void MainWindow::createStatusBar()
 void MainWindow::updateWindowTitle()
 {
     setWindowFilePath( current_filename_ );
-    setWindowTitle( QString( "[*]%1 - LargeFileEditor" ).arg( current_filename_ ) );
+    QString displayName =
+        current_filename_ == "Untitled" ? "Untitled" : QFileInfo( current_filename_ ).fileName();
+    setWindowTitle( QString( "[*]%1 - LargeFileEditor" ).arg( displayName ) );
 }
 
 void MainWindow::setFontSizeSmall()
@@ -171,7 +173,7 @@ void MainWindow::openFile()
     QString fileName = QFileDialog::getOpenFileName( this, "Open File", "", "All Files (*)" );
     if( !fileName.isEmpty() ) {
         qDebug() << "Opened file:" << fileName;
-        current_filename_ = QFileInfo( fileName ).fileName();
+        current_filename_ = fileName;
         setWindowModified( false );
         updateWindowTitle();
     }
@@ -197,7 +199,7 @@ void MainWindow::saveFileAs()
     QString fileName = QFileDialog::getSaveFileName( this, "Save File As", "", "All Files (*)" );
     if( !fileName.isEmpty() ) {
         qDebug() << "Save as file:" << fileName;
-        current_filename_ = QFileInfo( fileName ).fileName();
+        current_filename_ = fileName;
         setWindowModified( false );
         updateWindowTitle();
     }

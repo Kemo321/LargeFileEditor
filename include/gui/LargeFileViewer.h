@@ -6,12 +6,12 @@
 #pragma once
 
 #include <QAbstractScrollArea>
-#include <QList>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QRect>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QStringList>
 
 /**
  * @brief A custom minimalistic text rendering area designed to avoid
