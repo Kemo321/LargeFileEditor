@@ -7,14 +7,12 @@
 #define MAINWINDOW_H
 
 #include <QAction>
-#include <QDockWidget>
 #include <QLabel>
-#include <QLineEdit>
 #include <QMainWindow>
 #include <QMenu>
-#include <QPushButton>
+#include <QProgressBar>
+#include <QString>
 
-#include "backend/PieceTable.h"
 #include "gui/LargeFileViewer.h"
 
 class MainWindow : public QMainWindow {
@@ -22,23 +20,47 @@ class MainWindow : public QMainWindow {
 
 public:
     explicit MainWindow( QWidget* parent = nullptr );
-    ~MainWindow() override;
+    ~MainWindow() override = default;
 
 private:
+    void openFile();
+    void saveFile();
+    void saveFileAs();
+    void findText();
+    void replaceText();
+    void showFontDialog();
+    void setModifiedMock();
+
     void createActions();
     void createMenus();
     void createStatusBar();
-
-    QLabel* status_label_{};
-    PieceTable piece_table_;
+    void updateWindowTitle();
 
     LargeFileViewer* viewer_;
 
+    // Status bar widgets
+    QLabel* cursor_pos_label_{};
+    QProgressBar* task_progress_bar_{};
+    QLabel* task_status_label_{};
+
+    // File Actions
     QAction* open_act_{};
+    QAction* save_act_{};
     QAction* save_as_act_{};
     QAction* exit_act_{};
+
+    // Edit Actions
+    QAction* copy_act_{};
+    QAction* cut_act_{};
+    QAction* paste_act_{};
     QAction* find_act_{};
     QAction* replace_act_{};
+
+    // View Actions
+    QAction* font_act_{};
+
+    // Mock State
+    QString current_filename_;
 };
 
 #endif
