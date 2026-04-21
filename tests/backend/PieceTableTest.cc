@@ -346,4 +346,107 @@ TEST_F( PieceTableTest, ComplexCaseOfMultipleInsertsAndDeletes )
     EXPECT_EQ( pieceTable.getSubstr( 6, 3 ), "cat" );  // Test getSubstr
 }
 
+TEST_F( PieceTableTest, FindAllWithEmptyPatternOrEmptyTable )
+{
+    PieceTable emptyTable;
+    EXPECT_TRUE( emptyTable.findAll( "Test" ).empty() );
+    EXPECT_TRUE( emptyTable.findAll( "" ).empty() );
+
+    PieceTable pieceTable( createTempFile( "Hello World" ) );
+    EXPECT_TRUE( pieceTable.findAll( "" ).empty() );
+}
+
+TEST_F( PieceTableTest, FindAllNoMatch )
+{
+    PieceTable pieceTable( createTempFile( "Hello World" ) );
+    auto results = pieceTable.findAll( "ZPR" );
+    EXPECT_TRUE( results.empty() );
+}
+
+TEST_F( PieceTableTest, FindAllSingleOriginalPiece )
+{
+    PieceTable pieceTable( createTempFile( "Hello World Hello" ) );
+    auto results = pieceTable.findAll( "Hello" );
+
+    ASSERT_EQ( results.size(), 2 );
+    EXPECT_EQ( results[0], 0 );
+    EXPECT_EQ( results[1], 12 );
+}
+
+TEST_F( PieceTableTest, FindAllSingleAddPiece )
+{
+    PieceTable pieceTable;
+    pieceTable.insert( 0, "Test data Test" );
+    auto results = pieceTable.findAll( "Test" );
+
+    ASSERT_EQ( results.size(), 2 );
+    EXPECT_EQ( results[0], 0 );
+    EXPECT_EQ( results[1], 10 );
+}
+
+TEST_F( PieceTableTest, FindAllSpanningOriginalToAddBoundary )
+{
+    PieceTable pieceTable( createTempFile( "Hel World" ) );
+    pieceTable.insert( 3, "lo" );
+
+    auto results = pieceTable.findAll( "Hello" );
+    ASSERT_EQ( results.size(), 1 );
+    EXPECT_EQ( results[0], 0 );
+}
+
+TEST_F( PieceTableTest, FindAllSpanningAddToOriginalBoundary )
+{
+    PieceTable pieceTable( createTempFile( "lo World" ) );
+    pieceTable.insert( 0, "Hel" );
+
+    auto results = pieceTable.findAll( "Hello" );
+    ASSERT_EQ( results.size(), 1 );
+    EXPECT_EQ( results[0], 0 );
+}
+
+TEST_F( PieceTableTest, FindAllSpanningMultipleTinyPieces )
+{
+    PieceTable pieceTable;
+    pieceTable.insert( 0, "H" );
+    pieceTable.insert( 1, "e" );
+    pieceTable.insert( 2, "l" );
+    pieceTable.insert( 3, "l" );
+    pieceTable.insert( 4, "o" );
+
+    auto results = pieceTable.findAll( "Hello" );
+    ASSERT_EQ( results.size(), 1 );
+    EXPECT_EQ( results[0], 0 );
+}
+
+TEST_F( PieceTableTest, FindAllOverlappingMatches )
+{
+    PieceTable pieceTable( createTempFile( "ANANA" ) );
+
+    auto results = pieceTable.findAll( "ANA" );
+    ASSERT_EQ( results.size(), 2 );
+    EXPECT_EQ( results[0], 0 );
+    EXPECT_EQ( results[1], 2 );
+}
+
+TEST_F( PieceTableTest, FindAllComplexLPSBranchCoverage )
+{
+    PieceTable pieceTable( createTempFile( "ABACABAD ABACABAD" ) );
+
+    auto results = pieceTable.findAll( "ABACABAD" );
+    ASSERT_EQ( results.size(), 2 );
+    EXPECT_EQ( results[0], 0 );
+    EXPECT_EQ( results[1], 9 );
+}
+
+TEST_F( PieceTableTest, FindAllKMPMismatchFallbackInsideSearch )
+{
+    PieceTable pieceTable( createTempFile( "AABAACAADAABAABA" ) );
+
+    auto results = pieceTable.findAll( "AABA" );
+    ASSERT_EQ( results.size(), 3 );
+    EXPECT_EQ( results[0], 0 );
+    EXPECT_EQ( results[1], 9 );
+    EXPECT_EQ( results[2], 12 );
+}
+
 // NOLINTEND(readability-magic-numbers)

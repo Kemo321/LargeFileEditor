@@ -63,6 +63,13 @@ public:
     [[nodiscard]] auto getText() const -> std::string;
 
     /**
+     * @brief Searches for all occurrences of a pattern using the KMP algorithm.
+     * @param pattern The string to search for.
+     * @return Vector of logical positions where the pattern starts.
+     */
+    [[nodiscard]] auto findAll( const std::string& pattern ) const -> std::vector<uint64_t>;
+
+    /**
      * @brief Retrieves a fragment of the document without copying the entire file.
      * @param position Starting logical position.
      * @param length Number of characters to retrieve.
@@ -88,6 +95,11 @@ public:
     [[nodiscard]] auto saveToFile( const std::string& filePath ) const -> bool;
 
 private:
+    /**
+     * @brief Computes the Longest Prefix Suffix (LPS) array for the KMP algorithm.
+     */
+    [[nodiscard]] static auto computeLPS( const std::string& pattern ) -> std::vector<int>;
+
     /**
      * @brief Result of finding a piece at a specific logical position.
      */
