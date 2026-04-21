@@ -27,7 +27,7 @@ public:
     /**
      * @brief Mock method demonstrating how search result highlights will be visually applied.
      */
-    void setMockHighlights( const QList<QRect>& highlights );
+    void setMockHighlights( const QStringList& words );
 
 protected:
     /**
@@ -38,5 +38,5 @@ protected:
 private:
     void onScrollbarMoved( int value );
 
-    QList<QRect> mock_highlights_;
+    QStringList mock_highlight_words_;
 };

@@ -6,15 +6,22 @@
 #include "gui/MainWindow.h"
 
 #include <QApplication>
+#include <QDebug>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QTimer>
 
+#include "gui/FontDialog.h"
+
 MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filename_( "Untitled" )
 {
     viewer_ = new LargeFileViewer( this );
     setCentralWidget( viewer_ );
+
+    find_replace_dialog_ = new FindReplaceDialog( this );
 
     createActions();
     createMenus();
@@ -128,21 +135,20 @@ void MainWindow::setModifiedMock()
 {
     setWindowModified( true );
 
-    // Mock setting a search highlight
-    QList<QRect> highlights;
-    highlights.append( QRect( 100, 100, 150, 30 ) );
-    highlights.append( QRect( 120, 250, 80, 30 ) );
-    viewer_->setMockHighlights( highlights );
+    viewer_->setMockHighlights( QStringList{ "dolore", "culpa" } );
 
     task_status_label_->setText( "Mock modifications applied." );
 }
 
 void MainWindow::openFile()
 {
-    QMessageBox::information( this, "Mockup", "Open File Dialog Mockup" );
-    current_filename_ = "MassiveData.log";
-    setWindowModified( false );
-    updateWindowTitle();
+    QString fileName = QFileDialog::getOpenFileName( this, "Open File", "", "All Files (*)" );
+    if( !fileName.isEmpty() ) {
+        qDebug() << "Opened file:" << fileName;
+        current_filename_ = QFileInfo( fileName ).fileName();
+        setWindowModified( false );
+        updateWindowTitle();
+    }
 }
 
 void MainWindow::saveFile()
@@ -163,20 +169,29 @@ void MainWindow::saveFile()
 
 void MainWindow::saveFileAs()
 {
-    QMessageBox::information( this, "Mockup", "Save File As Dialog Mockup" );
+    QString fileName = QFileDialog::getSaveFileName( this, "Save File As", "", "All Files (*)" );
+    if( !fileName.isEmpty() ) {
+        qDebug() << "Save as file:" << fileName;
+        current_filename_ = QFileInfo( fileName ).fileName();
+        setWindowModified( false );
+        updateWindowTitle();
+    }
 }
 
 void MainWindow::findText()
 {
-    QMessageBox::information( this, "Mockup", "Find Dialog Mockup\n(Separate Window)" );
+    find_replace_dialog_->showFind();
 }
 
 void MainWindow::replaceText()
 {
-    QMessageBox::information( this, "Mockup", "Replace Dialog Mockup\n(Separate Window)" );
+    find_replace_dialog_->showReplace();
 }
 
 void MainWindow::showFontDialog()
 {
-    QMessageBox::information( this, "Mockup", "Font Selection Dialog Mockup" );
+    FontDialog dialog( this );
+    if( dialog.exec() == QDialog::Accepted ) {
+        qDebug() << "Font size accepted.";
+    }
 }

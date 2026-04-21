@@ -42,9 +42,9 @@ LargeFileViewer::LargeFileViewer( QWidget* parent ) : QAbstractScrollArea( paren
     connect( vScrollBar, &QScrollBar::sliderMoved, this, &LargeFileViewer::onScrollbarMoved );
 }
 
-void LargeFileViewer::setMockHighlights( const QList<QRect>& highlights )
+void LargeFileViewer::setMockHighlights( const QStringList& words )
 {
-    mock_highlights_ = highlights;
+    mock_highlight_words_ = words;
     viewport()->update();
 }
 
@@ -69,17 +69,57 @@ void LargeFileViewer::paintEvent( QPaintEvent* event )
     // Fill background
     painter.fillRect( event->rect(), Qt::white );
 
-    // Draw mock search highlights
-    if( !mock_highlights_.isEmpty() ) {
-        painter.setPen( Qt::NoPen );
-        painter.setBrush( QColor( 255, 255, 0, 150 ) );  // Semi-transparent yellow
-        for( const QRect& rect : mock_highlights_ ) {
-            painter.drawRect( rect );
-        }
-    }
+    // Draw Line Number Margin
+    int gutterWidth = 50;
+    painter.fillRect( 0, 0, gutterWidth, viewport()->height(), QColor( "#f0f0f0" ) );
+    painter.setPen( QColor( "#d0d0d0" ) );
+    painter.drawLine( gutterWidth, 0, gutterWidth, viewport()->height() );
 
-    // Draw minimalistic text
-    painter.setPen( Qt::black );
-    painter.drawText( viewport()->rect(), Qt::AlignCenter,
-                      "Minimalistic Large File Text Rendering Area\n(Scroll for Tooltip Mockup)" );
+    // Mock data for testing alignment
+    QStringList mockText = { "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+                             "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+                             "Ut enim ad minim veniam, quis nostrud exercitation ullamco",
+                             "laboris nisi ut aliquip ex ea commodo consequat.",
+                             "Duis aute irure dolor in reprehenderit in voluptate velit",
+                             "esse cillum dolore eu fugiat nulla pariatur.",
+                             "Excepteur sint occaecat cupidatat non proident, sunt in",
+                             "culpa qui officia deserunt mollit anim id est laborum.",
+                             "Sed ut perspiciatis unde omnis iste natus error sit voluptatem",
+                             "accusantium doloremque laudantium, totam rem aperiam.",
+                             "Minimalistic Large File Text Rendering Area (Mockup)",
+                             "Scroll for Tooltip Mockup" };
+
+    QFontMetrics fm( painter.font() );
+    int y = fm.ascent() + 5;
+
+    for( int i = 0; i < mockText.size(); ++i ) {
+        // Draw Line number
+        painter.setPen( QColor( "#808080" ) );
+        painter.drawText( QRect( 0, y - fm.ascent(), gutterWidth - 5, fm.height() ),
+                          Qt::AlignRight | Qt::AlignVCenter, QString::number( i + 1 ) );
+
+        int textX = gutterWidth + 10;
+        QString lineText = mockText[i];
+
+        // Draw highlights if they match any word
+        if( !mock_highlight_words_.isEmpty() ) {
+            for( const QString& word : mock_highlight_words_ ) {
+                int idx = 0;
+                while( ( idx = lineText.indexOf( word, idx, Qt::CaseInsensitive ) ) != -1 ) {
+                    int startX = textX + fm.horizontalAdvance( lineText.left( idx ) );
+                    int wordWidth = fm.horizontalAdvance( lineText.mid( idx, word.length() ) );
+                    painter.setPen( Qt::NoPen );
+                    painter.setBrush( QColor( 255, 255, 0, 150 ) );  // Semi-transparent yellow
+                    painter.drawRect( startX, y - fm.ascent(), wordWidth, fm.height() );
+                    idx += word.length();
+                }
+            }
+        }
+
+        // Draw Text
+        painter.setPen( Qt::black );
+        painter.drawText( textX, y, lineText );
+
+        y += fm.height() + 5;  // move down for next line
+    }
 }
