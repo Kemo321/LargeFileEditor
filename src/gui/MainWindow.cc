@@ -10,11 +10,10 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMenuBar>
-#include <QMessageBox>
 #include <QStatusBar>
 #include <QTimer>
 
-#include "gui/FontDialog.h"
+#include "gui/FindReplaceDialog.h"
 
 MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filename_( "Untitled" )
 {
@@ -27,11 +26,12 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     createMenus();
     createStatusBar();
 
+    // Show asterik right away and mock highlitghts
+    setWindowModified( true );
+    viewer_->setMockHighlights( QStringList{ "dolore", "culpa" } );
+
     updateWindowTitle();
     resize( 800, 600 );
-
-    // Mock an unsaved modification after a few seconds to demonstrate the '*'
-    QTimer::singleShot( 2000, this, &MainWindow::setModifiedMock );
 }
 
 void MainWindow::createActions()
@@ -81,9 +81,26 @@ void MainWindow::createActions()
     connect( replace_act_, &QAction::triggered, this, &MainWindow::replaceText );
 
     // View
-    font_act_ = new QAction( "&Font...", this );
-    font_act_->setStatusTip( "Edit font settings" );
-    connect( font_act_, &QAction::triggered, this, &MainWindow::showFontDialog );
+    font_small_act_ = new QAction( "Small", this );
+    font_small_act_->setCheckable( true );
+    connect( font_small_act_, &QAction::triggered, this, &MainWindow::setFontSizeSmall );
+
+    font_medium_act_ = new QAction( "Medium", this );
+    font_medium_act_->setCheckable( true );
+    connect( font_medium_act_, &QAction::triggered, this, &MainWindow::setFontSizeMedium );
+
+    font_large_act_ = new QAction( "Large", this );
+    font_large_act_->setCheckable( true );
+    connect( font_large_act_, &QAction::triggered, this, &MainWindow::setFontSizeLarge );
+
+    font_size_group_ = new QActionGroup( this );
+    font_size_group_->addAction( font_small_act_ );
+    font_size_group_->addAction( font_medium_act_ );
+    font_size_group_->addAction( font_large_act_ );
+    font_size_group_->setExclusive( true );
+
+    // Default to medium
+    font_medium_act_->setChecked( true );
 }
 
 void MainWindow::createMenus()
@@ -104,7 +121,10 @@ void MainWindow::createMenus()
     editMenu->addAction( replace_act_ );
 
     QMenu* viewMenu = menuBar()->addMenu( "&View" );
-    viewMenu->addAction( font_act_ );
+    QMenu* fontSizeMenu = viewMenu->addMenu( "Font Size" );
+    fontSizeMenu->addAction( font_small_act_ );
+    fontSizeMenu->addAction( font_medium_act_ );
+    fontSizeMenu->addAction( font_large_act_ );
 }
 
 void MainWindow::createStatusBar()
@@ -131,13 +151,19 @@ void MainWindow::updateWindowTitle()
     setWindowTitle( QString( "[*]%1 - LargeFileEditor" ).arg( current_filename_ ) );
 }
 
-void MainWindow::setModifiedMock()
+void MainWindow::setFontSizeSmall()
 {
-    setWindowModified( true );
+    qDebug() << "Font size set to Small.";
+}
 
-    viewer_->setMockHighlights( QStringList{ "dolore", "culpa" } );
+void MainWindow::setFontSizeMedium()
+{
+    qDebug() << "Font size set to Medium.";
+}
 
-    task_status_label_->setText( "Mock modifications applied." );
+void MainWindow::setFontSizeLarge()
+{
+    qDebug() << "Font size set to Large.";
 }
 
 void MainWindow::openFile()
@@ -153,7 +179,6 @@ void MainWindow::openFile()
 
 void MainWindow::saveFile()
 {
-    QMessageBox::information( this, "Mockup", "Saving File Mockup" );
     setWindowModified( false );
 
     // Show mock progress
@@ -186,12 +211,4 @@ void MainWindow::findText()
 void MainWindow::replaceText()
 {
     find_replace_dialog_->showReplace();
-}
-
-void MainWindow::showFontDialog()
-{
-    FontDialog dialog( this );
-    if( dialog.exec() == QDialog::Accepted ) {
-        qDebug() << "Font size accepted.";
-    }
 }

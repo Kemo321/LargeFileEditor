@@ -7,6 +7,7 @@
 #define MAINWINDOW_H
 
 #include <QAction>
+#include <QActionGroup>
 #include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
@@ -54,14 +55,19 @@ private:
     void replaceText();
 
     /**
-     * @brief Shows the font size dialog.
+     * @brief Changes font size to Small.
      */
-    void showFontDialog();
+    static void setFontSizeSmall();
 
     /**
-     * @brief Mocks an unsaved document state.
+     * @brief Changes font size to Medium.
      */
-    void setModifiedMock();
+    static void setFontSizeMedium();
+
+    /**
+     * @brief Changes font size to Large.
+     */
+    static void setFontSizeLarge();
 
     void createActions();
     void createMenus();
@@ -90,7 +96,10 @@ private:
     QAction* replace_act_{};
 
     // View Actions
-    QAction* font_act_{};
+    QAction* font_small_act_{};
+    QAction* font_medium_act_{};
+    QAction* font_large_act_{};
+    QActionGroup* font_size_group_{};
 
     // Mock State
     QString current_filename_;

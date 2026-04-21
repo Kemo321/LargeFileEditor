@@ -85,9 +85,11 @@ void LargeFileViewer::paintEvent( QPaintEvent* event )
                              "Excepteur sint occaecat cupidatat non proident, sunt in",
                              "culpa qui officia deserunt mollit anim id est laborum.",
                              "Sed ut perspiciatis unde omnis iste natus error sit voluptatem",
+                             "",
                              "accusantium doloremque laudantium, totam rem aperiam.",
                              "Minimalistic Large File Text Rendering Area (Mockup)",
-                             "Scroll for Tooltip Mockup" };
+                             "Scroll for Tooltip Mockup",
+                             "Highlighting Mockup: dolore, culpa" };
 
     QFontMetrics fm( painter.font() );
     int y = fm.ascent() + 5;
