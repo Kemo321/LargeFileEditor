@@ -160,6 +160,8 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
         return;
     }
 
+    saveState();
+
     const uint64_t currentSize = size();
     if( position > currentSize ) {
         throw std::out_of_range( "Insert out of range" );
@@ -191,6 +193,9 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
     if( length == 0 ) {
         return;
     }
+
+    saveState();
+
     if( position + length > size() ) {
         throw std::out_of_range( "Remove out of range" );
     }
@@ -235,7 +240,11 @@ auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
         }
     }
 
-    return outFile.good();
+    if (outFile.good()) {
+        const_cast<PieceTable*>(this)->lastSavedUndoSize_ = undoStack_.size();
+        return true;
+    }
+    return false;
 }
 
 auto PieceTable::computeLPS( const std::string& pattern ) -> std::vector<int>
@@ -305,4 +314,169 @@ auto PieceTable::findAll( const std::string& pattern ) const -> std::vector<uint
     }
 
     return results;
+}
+
+auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement ) -> uint64_t
+{
+    if ( pattern.empty() ) return 0;
+
+    std::vector<uint64_t> occurrences = findAll( pattern );
+    if ( occurrences.empty() ) return 0;
+
+    saveState();
+    isBatchOperation_ = true;
+
+    uint64_t patternLen = pattern.length();
+
+    for ( auto it = occurrences.rbegin(); it != occurrences.rend(); ++it ) {
+        uint64_t pos = *it;
+        remove( pos, patternLen );
+        insert( pos, replacement );
+    }
+
+    isBatchOperation_ = false;
+
+    return static_cast<uint64_t>( occurrences.size() );
+}
+
+auto PieceTable::replaceFirst( const std::string& pattern, const std::string& replacement ) -> bool
+{
+    std::vector<uint64_t> occurrences = findAll( pattern );
+    if ( occurrences.empty() ) return false;
+
+    remove( occurrences[0], pattern.length() );
+    insert( occurrences[0], replacement );
+    return true;
+}
+
+void PieceTable::saveState() {
+    if (isBatchOperation_) return;
+
+    undoStack_.push_back(pieces_);
+    redoStack_.clear();
+
+    if (undoStack_.size() > 100) {
+        undoStack_.erase(undoStack_.begin());
+    }
+}
+
+auto PieceTable::undo() -> bool {
+    if (undoStack_.empty()) {
+        return false;
+    }
+
+    redoStack_.push_back(pieces_);
+    
+    pieces_ = undoStack_.back();
+    undoStack_.pop_back();
+    
+    return true;
+}
+
+auto PieceTable::redo() -> bool {
+    if (redoStack_.empty()) {
+        return false;
+    }
+
+    undoStack_.push_back(pieces_);
+    
+    pieces_ = redoStack_.back();
+    redoStack_.pop_back();
+    
+    return true;
+}
+
+PieceTable::PieceTable( PieceTable&& other ) noexcept
+    : originalBuffer_( other.originalBuffer_ ),
+      mmapSize_( other.mmapSize_ ),
+      fileDescriptor_( other.fileDescriptor_ ),
+      addBuffer_( std::move( other.addBuffer_ ) ),
+      pieces_( std::move( other.pieces_ ) ),
+      isBatchOperation_( other.isBatchOperation_ ),
+      lastSavedUndoSize_( other.lastSavedUndoSize_ ),
+      undoStack_( std::move( other.undoStack_ ) ),
+      redoStack_( std::move( other.redoStack_ ) )
+{
+    other.originalBuffer_ = nullptr;
+    other.fileDescriptor_ = -1;
+    other.mmapSize_ = 0;
+}
+
+auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
+{
+    if( this != &other ) {
+        closeMmap();
+
+        originalBuffer_ = other.originalBuffer_;
+        mmapSize_ = other.mmapSize_;
+        fileDescriptor_ = other.fileDescriptor_;
+        addBuffer_ = std::move( other.addBuffer_ );
+        pieces_ = std::move( other.pieces_ );
+        isBatchOperation_ = other.isBatchOperation_;
+        lastSavedUndoSize_ = other.lastSavedUndoSize_;
+        undoStack_ = std::move( other.undoStack_ );
+        redoStack_ = std::move( other.redoStack_ );
+
+        other.originalBuffer_ = nullptr;
+        other.fileDescriptor_ = -1;
+        other.mmapSize_ = 0;
+    }
+    return *this;
+}
+
+auto PieceTable::getLineOffsets() const -> std::vector<uint64_t>
+{
+    std::vector<uint64_t> offsets;
+    offsets.push_back( 0 );
+
+    uint64_t logicalPos = 0;
+
+    for( const auto& piece : pieces_ ) {
+        const char* bufferPtr = ( piece.type_ == BufferType::Original ) 
+                                ? originalBuffer_ 
+                                : addBuffer_.data();
+
+        if( bufferPtr == nullptr || bufferPtr == MAP_FAILED ) {
+            logicalPos += piece.length_;
+            continue;
+        }
+
+        for( uint64_t i = 0; i < piece.length_; ++i ) {
+            if( bufferPtr[piece.start_ + i] == '\n' ) {
+                offsets.push_back( logicalPos + i + 1 );
+            }
+        }
+        logicalPos += piece.length_;
+    }
+
+    return offsets;
+}
+
+auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const -> std::vector<Piece>
+{
+    std::vector<Piece> fragments;
+    
+    if( length == 0 || position >= size() ) {
+        return fragments;
+    }
+
+    uint64_t safeLength = std::min( length, size() - position );
+
+    auto [index, offset] = findPieceAt( position );
+    uint64_t remaining = safeLength;
+
+    while( remaining > 0 && index < pieces_.size() ) {
+        const Piece& piece = pieces_[index];
+        
+        uint64_t availableInPiece = piece.length_ - offset;
+        uint64_t toTake = std::min( remaining, availableInPiece );
+
+        fragments.push_back( { piece.type_, piece.start_ + offset, toTake } );
+
+        remaining -= toTake;
+        offset = 0;
+        index++;
+    }
+
+    return fragments;
 }
