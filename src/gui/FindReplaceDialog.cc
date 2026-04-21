@@ -112,7 +112,6 @@ void FindReplaceDialog::setupUi()
     connect( btnClose2, &QPushButton::clicked, this, &QDialog::hide );
     replaceLayout->addLayout( replaceButtonLayout );
 
-    // --- Add tabs ---
     tab_widget_->addTab( findTab, "Find" );
     tab_widget_->addTab( replaceTab, "Replace" );
 

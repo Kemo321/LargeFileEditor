@@ -29,44 +29,14 @@ public:
     ~MainWindow() override = default;
 
 private:
-    /**
-     * @brief Opens a native file dialog and selects a file.
-     */
     void openFile();
-
-    /**
-     * @brief Mocks saving the current file.
-     */
     void saveFile();
-
-    /**
-     * @brief Opens a native file dialog to save the current file as a new file.
-     */
     void saveFileAs();
-
-    /**
-     * @brief Shows the non-modal Find dialog.
-     */
     void findText();
-
-    /**
-     * @brief Shows the non-modal Replace dialog.
-     */
     void replaceText();
 
-    /**
-     * @brief Changes font size to Small.
-     */
     static void setFontSizeSmall();
-
-    /**
-     * @brief Changes font size to Medium.
-     */
     static void setFontSizeMedium();
-
-    /**
-     * @brief Changes font size to Large.
-     */
     static void setFontSizeLarge();
 
     void createActions();

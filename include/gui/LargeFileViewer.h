@@ -15,7 +15,7 @@
 
 /**
  * @brief A custom minimalistic text rendering area designed to avoid
- * loading the entire file into RAM. Currently a purely decoupled UI mockup.
+ * loading the entire file into RAM.
  */
 class LargeFileViewer : public QAbstractScrollArea {
     Q_OBJECT
