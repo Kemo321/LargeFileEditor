@@ -77,3 +77,4 @@ coverage.html
 coverage.js
 
 *.py
+.venv/

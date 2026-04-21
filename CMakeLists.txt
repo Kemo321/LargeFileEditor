@@ -20,8 +20,14 @@ find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 
 include_directories(include)
 
-set(SOURCES src/Main.cc src/backend/PieceTable.cc src/gui/MainWindow.cc
-            include/gui/MainWindow.h include/backend/PieceTable.h)
+set(SOURCES
+    src/Main.cc
+    src/backend/PieceTable.cc
+    src/gui/MainWindow.cc
+    src/gui/LargeFileViewer.cc
+    include/gui/MainWindow.h
+    include/gui/LargeFileViewer.h
+    include/backend/PieceTable.h)
 include_directories(include)
 
 add_executable(LargeFileEditor ${SOURCES})
