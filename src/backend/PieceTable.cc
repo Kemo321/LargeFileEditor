@@ -237,3 +237,73 @@ auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
 
     return outFile.good();
 }
+
+auto PieceTable::computeLPS( const std::string& pattern ) -> std::vector<int>
+{
+    const int length = static_cast<int>( pattern.length() );
+    std::vector<int> lps( length, 0 );
+    
+    int len = 0;
+    int i = 1;
+    
+    while( i < length ) {
+        if( pattern[i] == pattern[len] ) {
+            len++;
+            lps[i] = len;
+            i++;
+        } else {
+            if( len != 0 ) {
+                len = lps[len - 1];
+            } else {
+                lps[i] = 0;
+                i++;
+            }
+        }
+    }
+    return lps;
+}
+
+auto PieceTable::findAll( const std::string& pattern ) const -> std::vector<uint64_t>
+{
+    std::vector<uint64_t> results;
+    
+    if( pattern.empty() || size() == 0 ) {
+        return results;
+    }
+
+    std::vector<int> lps = computeLPS( pattern );
+    int j = 0;
+    uint64_t logical_pos = 0;
+
+    for( const auto& piece : pieces_ ) {
+        const char* bufferPtr = ( piece.type_ == BufferType::Original ) 
+                                ? originalBuffer_ 
+                                : addBuffer_.data();
+
+        if( bufferPtr == nullptr || bufferPtr == MAP_FAILED ) {
+            logical_pos += piece.length_;
+            continue;
+        }
+
+        for( uint64_t i = 0; i < piece.length_; ++i ) {
+            char currentChar = bufferPtr[piece.start_ + i];
+
+            while( j > 0 && pattern[j] != currentChar ) {
+                j = lps[j - 1];
+            }
+            
+            if( pattern[j] == currentChar ) {
+                j++;
+            }
+            
+            if( j == static_cast<int>( pattern.length() ) ) {
+                results.push_back( logical_pos - j + 1 );
+                j = lps[j - 1];
+            }
+            
+            logical_pos++;
+        }
+    }
+
+    return results;
+}
