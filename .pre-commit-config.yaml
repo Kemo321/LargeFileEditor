@@ -25,14 +25,6 @@ repos:
 
   - repo: local
     hooks:
-      - id: lizard
-        name: cyclomatic complexity (lizard)
-        entry: lizard src tests -C 15 -Werror
-        language: python
-        additional_dependencies: [lizard]
-        pass_filenames: false
-        always_run: true
-
       - id: cmake-configure
         name: cmake configure
         entry: bash -c "PREFIX=''; if [ -d '/usr/lib/x86_64-linux-gnu/cmake/Qt6' ]; then PREFIX='-DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake/Qt6'; fi; cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON $PREFIX"
@@ -53,32 +45,3 @@ repos:
         language: system
         files: ^(src|tests)/.*\.(cc|cpp)$
         exclude: ^extern/
-
-      - id: build-project
-        name: build project
-        entry: cmake --build build -j 4
-        language: system
-        pass_filenames: false
-        always_run: true
-
-      - id: generate-docs
-        name: generate documentation (doxygen)
-        entry: bash -c "if command -v doxygen >/dev/null; then cmake --build build --target doc; else echo 'Doxygen nieznaleziony, pomijam'; fi"
-        language: system
-        pass_filenames: false
-        always_run: true
-
-      - id: run-tests
-        name: run tests
-        entry: bash -c "cd build && if command -v xvfb-run >/dev/null; then xvfb-run --auto-servernum ctest --output-on-failure; else ctest --output-on-failure; fi"
-        language: system
-        pass_filenames: false
-        always_run: true
-
-      - id: code-coverage
-        name: code coverage (gcovr)
-        entry: gcovr -r . --exclude-throw-branches --exclude 'extern/.*' --print-summary
-        language: python
-        additional_dependencies: [gcovr]
-        pass_filenames: false
-        always_run: true

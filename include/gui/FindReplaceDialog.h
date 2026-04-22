@@ -1,3 +1,9 @@
+/**
+ * @file FindReplaceDialog.h
+ * @author Tomasz Okon
+ * @brief GUI Dialog for managing search and replace operations.
+ */
+
 #pragma once
 
 #include <QCheckBox>
@@ -7,25 +13,40 @@
 #include <QString>
 #include <QTabWidget>
 
+/**
+ * @class FindReplaceDialog
+ * @brief Simple tabbed dialog providing Find and Replace user inputs.
+ */
 class FindReplaceDialog : public QDialog {
     Q_OBJECT
 
 public:
+    /**
+     * @brief Constructs the dialog widget.
+     * @param parent Pointer to parent QWidget.
+     */
     explicit FindReplaceDialog( QWidget* parent = nullptr );
     ~FindReplaceDialog() override = default;
 
-    void showFind();
-    void showReplace();
+    /**
+     * @brief Displays the dialog on the Find tab.
+     */
+    auto showFind() -> void;
+
+    /**
+     * @brief Displays the dialog on the Replace tab.
+     */
+    auto showReplace() -> void;
 
 signals:
-    void findNextRequested( const QString& text, bool matchCase, bool matchWord );
-    void replaceNextRequested( const QString& findText, const QString& replaceText, bool matchCase,
-                               bool matchWord );
-    void replaceAllRequested( const QString& findText, const QString& replaceText, bool matchCase,
-                              bool matchWord );
+    auto findNextRequested( const QString& text, bool matchCase, bool matchWord ) -> void;
+    auto replaceNextRequested( const QString& findText, const QString& replaceText, bool matchCase,
+                               bool matchWord ) -> void;
+    auto replaceAllRequested( const QString& findText, const QString& replaceText, bool matchCase,
+                              bool matchWord ) -> void;
 
 private:
-    void setupUi();
+    auto setupUi() -> void;
 
     QTabWidget* tab_widget_{};
 

@@ -21,7 +21,7 @@ FindReplaceDialog::FindReplaceDialog( QWidget* parent ) : QDialog( parent )
     connect( match_word_2_, &QCheckBox::toggled, match_word_1_, &QCheckBox::setChecked );
 }
 
-void FindReplaceDialog::showFind()
+auto FindReplaceDialog::showFind() -> void
 {
     tab_widget_->setCurrentIndex( 0 );
     show();
@@ -29,7 +29,7 @@ void FindReplaceDialog::showFind()
     activateWindow();
 }
 
-void FindReplaceDialog::showReplace()
+auto FindReplaceDialog::showReplace() -> void
 {
     tab_widget_->setCurrentIndex( 1 );
     show();
@@ -37,12 +37,11 @@ void FindReplaceDialog::showReplace()
     activateWindow();
 }
 
-void FindReplaceDialog::setupUi()
+auto FindReplaceDialog::setupUi() -> void
 {
     auto* mainLayout = new QVBoxLayout( this );
     tab_widget_ = new QTabWidget( this );
 
-    // --- Find Tab ---
     auto* findTab = new QWidget( tab_widget_ );
     auto* findLayout = new QVBoxLayout( findTab );
 

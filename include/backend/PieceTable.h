@@ -1,6 +1,7 @@
 /**
- * Authors: Tomasz Okon
- * Description: Header of the logic layer (backend) - Piece Table implementation.
+ * @file PieceTable.h
+ * @author Tomasz Okon
+ * @brief Logic layer header for the Piece Table implementation.
  */
 
 #pragma once
@@ -9,10 +10,22 @@
 #include <string>
 #include <vector>
 
+/**
+ * @class PieceTable
+ * @brief Efficient data structure for text editing in very large files.
+ */
 class PieceTable {
 public:
-    enum class BufferType { Original, Add };
+    /**
+     * @enum BufferType
+     * @brief Identifies the buffer origin for a specific text piece.
+     */
+    enum class BufferType : std::uint8_t { Original, Add };
 
+    /**
+     * @struct Piece
+     * @brief Represents a continuous segment of text in one of the buffers.
+     */
     struct Piece {
         BufferType type_;
         uint64_t start_;
@@ -20,8 +33,20 @@ public:
         uint32_t line_count_;
     };
 
+    /**
+     * @brief Default constructor for an empty PieceTable.
+     */
     PieceTable();
+
+    /**
+     * @brief Constructs a PieceTable by memory-mapping a file.
+     * @param filePath Path to the file.
+     */
     explicit PieceTable( const std::string& filePath );
+
+    /**
+     * @brief Destructor that closes memory maps.
+     */
     ~PieceTable();
 
     PieceTable( const PieceTable& ) = delete;
@@ -30,31 +55,145 @@ public:
     PieceTable( PieceTable&& other ) noexcept;
     auto operator=( PieceTable&& other ) noexcept -> PieceTable&;
 
+    /**
+     * @brief Replaces the first occurrence of a pattern.
+     * @param pattern The string to search for.
+     * @param replacement The string to substitute.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @return True if a replacement was made.
+     */
     auto replaceFirst( const std::string& pattern, const std::string& replacement,
                        bool matchCase = true, bool matchWord = false ) -> bool;
+
+    /**
+     * @brief Replaces all occurrences of a pattern.
+     * @param pattern The string to search for.
+     * @param replacement The string to substitute.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @return Number of replacements made.
+     */
     auto replaceAll( const std::string& pattern, const std::string& replacement,
                      bool matchCase = true, bool matchWord = false ) -> uint64_t;
 
+    /**
+     * @brief Retrieves the total logical size of the text.
+     * @return Size in bytes.
+     */
     [[nodiscard]] auto size() const -> uint64_t;
+
+    /**
+     * @brief Reconstructs the entire text into a string.
+     * @return The complete document text.
+     */
     [[nodiscard]] auto getText() const -> std::string;
+
+    /**
+     * @brief Finds all logical positions of a substring.
+     * @param pattern The string to search for.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @return Vector of starting byte positions.
+     */
     [[nodiscard]] auto findAll( const std::string& pattern, bool matchCase = true,
                                 bool matchWord = false ) const -> std::vector<uint64_t>;
+
+    /**
+     * @brief Retrieves a specific substring.
+     * @param position Starting logical byte position.
+     * @param length Number of bytes to retrieve.
+     * @return The requested substring.
+     */
     [[nodiscard]] auto getSubstr( uint64_t position, uint64_t length ) const -> std::string;
+
+    /**
+     * @brief Retrieves fragment metadata for a specific range.
+     * @param position Starting logical byte position.
+     * @param length Length of the range.
+     * @return Vector of intersecting pieces.
+     */
     [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const
         -> std::vector<Piece>;
 
+    /**
+     * @brief Inserts text at the specified logical position.
+     * @param position Byte position to insert at.
+     * @param text String to insert.
+     */
     auto insert( uint64_t position, const std::string& text ) -> void;
+
+    /**
+     * @brief Removes text from the specified logical position.
+     * @param position Starting byte position.
+     * @param length Number of bytes to remove.
+     */
     auto remove( uint64_t position, uint64_t length ) -> void;
+
+    /**
+     * @brief Saves the active document state to a file.
+     * @param filePath Destination file path.
+     * @return True if save was successful.
+     */
     [[nodiscard]] auto saveToFile( const std::string& filePath ) const -> bool;
 
+    /**
+     * @brief Reverts the last text modification.
+     * @return True if undo was successful.
+     */
     auto undo() -> bool;
-    auto redo() -> bool;
-    [[nodiscard]] auto canUndo() const -> bool { return !undoStack_.empty(); }
-    [[nodiscard]] auto canRedo() const -> bool { return !redoStack_.empty(); }
-    [[nodiscard]] auto isDirty() const -> bool { return undoStack_.size() != lastSavedUndoSize_; }
 
+    /**
+     * @brief Reapplies the last reverted text modification.
+     * @return True if redo was successful.
+     */
+    auto redo() -> bool;
+
+    /**
+     * @brief Checks if an undo operation is available.
+     * @return True if undo stack is not empty.
+     */
+    [[nodiscard]] auto canUndo() const -> bool
+    {
+        return !undoStack_.empty();
+    }
+
+    /**
+     * @brief Checks if a redo operation is available.
+     * @return True if redo stack is not empty.
+     */
+    [[nodiscard]] auto canRedo() const -> bool
+    {
+        return !redoStack_.empty();
+    }
+
+    /**
+     * @brief Checks if the document has unsaved modifications.
+     * @return True if state differs from last save.
+     */
+    [[nodiscard]] auto isDirty() const -> bool
+    {
+        return undoStack_.size() != lastSavedUndoSize_;
+    }
+
+    /**
+     * @brief Calculates the total number of lines in the document.
+     * @return Line count.
+     */
     [[nodiscard]] auto getLineCount() const -> int;
+
+    /**
+     * @brief Finds the starting byte position of a given line.
+     * @param line Zero-based line index.
+     * @return Logical byte position.
+     */
     [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
+
+    /**
+     * @brief Determines the line number for a specific byte position.
+     * @param position Logical byte position.
+     * @return Zero-based line index.
+     */
     [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
 
 private:
@@ -82,7 +221,7 @@ private:
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
-    
+
     std::vector<uint64_t> originalNewlines_;
     std::vector<uint64_t> addNewlines_;
 

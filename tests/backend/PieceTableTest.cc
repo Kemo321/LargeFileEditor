@@ -1,6 +1,7 @@
 /**
- * Authors: Tomasz Okon
- * Description: Unit tests for the PieceTable class.
+ * @file PieceTableTest.cc
+ * @author Tomasz Okon
+ * @brief Unit tests for the PieceTable backend logic.
  */
 #include <gtest/gtest.h>
 
@@ -11,19 +12,15 @@
 
 #include "backend/PieceTable.h"
 
-// NOLINTBEGIN(readability-magic-numbers)
-
 class PieceTableTest : public ::testing::Test {
 protected:
     std::string tempFilePath_ = "test_piece_table_temp.txt";
 
-    // cppcheck-suppress unusedFunction
-    void SetUp() override
+    auto SetUp() -> void override
     {
     }
 
-    // cppcheck-suppress unusedFunction
-    void TearDown() override
+    auto TearDown() -> void override
     {
         std::remove( tempFilePath_.c_str() );
     }
@@ -88,15 +85,15 @@ TEST_F( PieceTableTest, MultipleInsertsGrowth )
 TEST_F( PieceTableTest, InsertConsecutiveAtSamePosition )
 {
     PieceTable pieceTable( createTempFile( "AC" ) );
-    pieceTable.insert( 1, "B" );  // ABC
-    pieceTable.insert( 1, "X" );  // AXBC
+    pieceTable.insert( 1, "B" );
+    pieceTable.insert( 1, "X" );
     EXPECT_EQ( pieceTable.getText(), "AXBC" );
 }
 
 TEST_F( PieceTableTest, RemoveAtBeginning )
 {
     PieceTable pieceTable( createTempFile( "Hello World" ) );
-    pieceTable.remove( 0, 6 );  // Deletes "Hello "
+    pieceTable.remove( 0, 6 );
     EXPECT_EQ( pieceTable.getText(), "World" );
     EXPECT_EQ( pieceTable.size(), 5 );
 }
@@ -104,7 +101,7 @@ TEST_F( PieceTableTest, RemoveAtBeginning )
 TEST_F( PieceTableTest, RemoveAtEnd )
 {
     PieceTable pieceTable( createTempFile( "Hello World" ) );
-    pieceTable.remove( 5, 6 );  // Deletes " World"
+    pieceTable.remove( 5, 6 );
     EXPECT_EQ( pieceTable.getText(), "Hello" );
     EXPECT_EQ( pieceTable.size(), 5 );
 }
@@ -112,7 +109,7 @@ TEST_F( PieceTableTest, RemoveAtEnd )
 TEST_F( PieceTableTest, RemoveInTheMiddle )
 {
     PieceTable pieceTable( createTempFile( "Hello CRUEL World" ) );
-    pieceTable.remove( 5, 6 );  // Deletes " CRUEL"
+    pieceTable.remove( 5, 6 );
     EXPECT_EQ( pieceTable.getText(), "Hello World" );
 }
 
@@ -127,10 +124,7 @@ TEST_F( PieceTableTest, RemoveEntireText )
 TEST_F( PieceTableTest, RemoveSpanningMultiplePieces )
 {
     PieceTable pieceTable( createTempFile( "Hello World" ) );
-    pieceTable.insert( 5, " Cruel" );  // "Hello Cruel World"
-
-    // We remove "Cruel Wor" (part from the Add Buffer, part from the Original Buffer)
-    // This is a so-called killer test for Piece Table.
+    pieceTable.insert( 5, " Cruel" );
     pieceTable.remove( 6, 9 );
     EXPECT_EQ( pieceTable.getText(), "Hello ld" );
 }
@@ -138,8 +132,7 @@ TEST_F( PieceTableTest, RemoveSpanningMultiplePieces )
 TEST_F( PieceTableTest, InsertInsideInsertedText )
 {
     PieceTable pieceTable( createTempFile( "Start End" ) );
-    pieceTable.insert( 6, "The " );  // "Start The End"
-    // Now we insert into the middle of text that is already in the Add Buffer
+    pieceTable.insert( 6, "The " );
     pieceTable.insert( 10, "Great " );
     EXPECT_EQ( pieceTable.getText(), "Start The Great End" );
 }
@@ -147,18 +140,18 @@ TEST_F( PieceTableTest, InsertInsideInsertedText )
 TEST_F( PieceTableTest, ComplexEditingTypingSimulation )
 {
     PieceTable pieceTable( createTempFile( "This is a test." ) );
-    pieceTable.remove( 10, 4 );             // "This is a ."
-    pieceTable.insert( 10, "cat" );         // "This is a cat."
-    pieceTable.insert( 13, " and a dog" );  // "This is a cat and a dog."
-    pieceTable.remove( 0, 5 );              // "is a cat and a dog."
-    pieceTable.insert( 0, "That " );        // "That is a cat and a dog."
+    pieceTable.remove( 10, 4 );
+    pieceTable.insert( 10, "cat" );
+    pieceTable.insert( 13, " and a dog" );
+    pieceTable.remove( 0, 5 );
+    pieceTable.insert( 0, "That " );
     EXPECT_EQ( pieceTable.getText(), "That is a cat and a dog." );
 }
 
 TEST_F( PieceTableTest, InsertEmptyString )
 {
     PieceTable pieceTable( createTempFile( "Test" ) );
-    pieceTable.insert( 2, "" );  // Nothing should change
+    pieceTable.insert( 2, "" );
     EXPECT_EQ( pieceTable.size(), 4 );
     EXPECT_EQ( pieceTable.getText(), "Test" );
 }
@@ -166,7 +159,7 @@ TEST_F( PieceTableTest, InsertEmptyString )
 TEST_F( PieceTableTest, RemoveZeroCharacters )
 {
     PieceTable pieceTable( createTempFile( "Test" ) );
-    pieceTable.remove( 2, 0 );  // Nothing should change
+    pieceTable.remove( 2, 0 );
     EXPECT_EQ( pieceTable.size(), 4 );
     EXPECT_EQ( pieceTable.getText(), "Test" );
 }
@@ -174,30 +167,25 @@ TEST_F( PieceTableTest, RemoveZeroCharacters )
 TEST_F( PieceTableTest, InsertOutOfBoundsThrowsException )
 {
     PieceTable pieceTable( createTempFile( "Test" ) );
-    // Attempting to insert beyond the file size should throw std::out_of_range
     EXPECT_THROW( pieceTable.insert( 5, " Out" ), std::out_of_range );
 }
 
 TEST_F( PieceTableTest, RemoveOutOfBoundsThrowsException )
 {
     PieceTable pieceTable( createTempFile( "Test" ) );
-    // Attempting to remove beyond the size (start is out of bounds)
     EXPECT_THROW( pieceTable.remove( 5, 1 ), std::out_of_range );
 }
 
 TEST_F( PieceTableTest, RemoveTooManyCharactersTruncatesOrThrows )
 {
     PieceTable pieceTable( createTempFile( "Test" ) );
-    // We assume a strict API - it throws if the user asks for too much.
     EXPECT_THROW( pieceTable.remove( 2, 10 ), std::out_of_range );
 }
 
 TEST_F( PieceTableTest, RemoveExactlyOnePiece )
 {
     PieceTable pieceTable( createTempFile( "Hello" ) );
-    // Insert a temporary chunk.
     pieceTable.insert( 2, "XX" );
-    // Remove the inserted chunk.
     pieceTable.remove( 2, 2 );
     EXPECT_EQ( pieceTable.getText(), "Hello" );
     EXPECT_EQ( pieceTable.size(), 5 );
@@ -206,23 +194,20 @@ TEST_F( PieceTableTest, RemoveExactlyOnePiece )
 TEST_F( PieceTableTest, RemoveCompletelyEliminatingMultipleMiddlePieces )
 {
     PieceTable pieceTable( createTempFile( "StartEnd" ) );
-    // Build multiple middle pieces.
-    pieceTable.insert( 5, "A" );  // StartAEnd
+    pieceTable.insert( 5, "A" );
     ASSERT_EQ( pieceTable.getText(), "StartAEnd" );
-    pieceTable.insert( 6, "B" );  // StartABEnd
+    pieceTable.insert( 6, "B" );
     ASSERT_EQ( pieceTable.getText(), "StartABEnd" );
-    pieceTable.insert( 7, "C" );  // StartABCEnd
+    pieceTable.insert( 7, "C" );
     ASSERT_EQ( pieceTable.getText(), "StartABCEnd" );
     EXPECT_EQ( pieceTable.getSubstr( 0, 11 ), "StartABCEnd" );
-    // Delete across all middle pieces.
-    pieceTable.remove( 4, 5 );  // Deletes "ABCEn"
+    pieceTable.remove( 4, 5 );
     EXPECT_EQ( pieceTable.getText(), "Starnd" );
 }
 
 TEST_F( PieceTableTest, InsertExactlyAtPieceBoundary )
 {
     PieceTable pieceTable( createTempFile( "AB" ) );
-    // Insert exactly on boundaries.
     pieceTable.insert( 1, "CD" );
     pieceTable.insert( 3, "EF" );
     EXPECT_EQ( pieceTable.getText(), "ACDEFB" );
@@ -232,7 +217,6 @@ TEST_F( PieceTableTest, DeleteExactlyUpToBoundary )
 {
     PieceTable pieceTable( createTempFile( "HelloWorld" ) );
     pieceTable.insert( 5, " " );
-    // Delete left side up to boundary.
     pieceTable.remove( 0, 5 );
     EXPECT_EQ( pieceTable.getText(), " World" );
 }
@@ -241,7 +225,6 @@ TEST_F( PieceTableTest, DeleteExactlyFromBoundary )
 {
     PieceTable pieceTable( createTempFile( "HelloWorld" ) );
     pieceTable.insert( 5, " " );
-    // Delete right side from boundary.
     pieceTable.remove( 5, 6 );
     EXPECT_EQ( pieceTable.getText(), "Hello" );
 }
@@ -249,7 +232,6 @@ TEST_F( PieceTableTest, DeleteExactlyFromBoundary )
 TEST_F( PieceTableTest, ConsecutiveDeletionsLikeBackspace )
 {
     PieceTable pieceTable( createTempFile( "Hello" ) );
-    // Simulate backspace key presses.
     pieceTable.remove( 4, 1 );
     pieceTable.remove( 3, 1 );
     pieceTable.remove( 2, 1 );
@@ -259,7 +241,6 @@ TEST_F( PieceTableTest, ConsecutiveDeletionsLikeBackspace )
 TEST_F( PieceTableTest, DeleteAllAndRebuild )
 {
     PieceTable pieceTable( createTempFile( "Old Text" ) );
-    // Clear everything and insert new text.
     pieceTable.remove( 0, pieceTable.size() );
     pieceTable.insert( 0, "New Text" );
     EXPECT_EQ( pieceTable.getText(), "New Text" );
@@ -274,7 +255,6 @@ TEST_F( PieceTableTest, RemoveStartingExactlyAtSizeThrows )
 TEST_F( PieceTableTest, RemoveZeroLengthAtSize )
 {
     PieceTable pieceTable( createTempFile( "Test" ) );
-    // Zero-length delete should do nothing.
     pieceTable.remove( 4, 0 );
     EXPECT_EQ( pieceTable.getText(), "Test" );
 }
@@ -282,7 +262,6 @@ TEST_F( PieceTableTest, RemoveZeroLengthAtSize )
 TEST_F( PieceTableTest, InsertMultipleTimesSequentiallyAtEnd )
 {
     PieceTable pieceTable;
-    // Build text by appending chars.
     pieceTable.insert( 0, "H" );
     pieceTable.insert( 1, "e" );
     pieceTable.insert( 2, "l" );
@@ -294,7 +273,6 @@ TEST_F( PieceTableTest, InsertMultipleTimesSequentiallyAtEnd )
 TEST_F( PieceTableTest, InsertMultipleTimesSequentiallyAtBeginning )
 {
     PieceTable pieceTable;
-    // Build text by prepending chars.
     pieceTable.insert( 0, "o" );
     pieceTable.insert( 0, "l" );
     pieceTable.insert( 0, "l" );
@@ -307,7 +285,6 @@ TEST_F( PieceTableTest, InsertMultipleTimesSequentiallyAtBeginning )
 TEST_F( PieceTableTest, ComplexSpanningDeleteAcrossThreePieces )
 {
     PieceTable pieceTable( createTempFile( "123789" ) );
-    // Create a middle piece then delete across pieces.
     pieceTable.insert( 3, "456" );
     EXPECT_EQ( pieceTable.getSubstr( 0, 9 ), "123456789" );
     pieceTable.remove( 2, 5 );
@@ -317,7 +294,6 @@ TEST_F( PieceTableTest, ComplexSpanningDeleteAcrossThreePieces )
 TEST_F( PieceTableTest, DeleteLeavingEmptyPieces )
 {
     PieceTable pieceTable( createTempFile( "ABCDEF" ) );
-    // Insert and remove the same middle segment.
     pieceTable.insert( 3, "XYZ" );
     pieceTable.remove( 3, 3 );
     EXPECT_EQ( pieceTable.getText(), "ABCDEF" );
@@ -328,22 +304,22 @@ TEST_F( PieceTableTest, DeleteLeavingEmptyPieces )
 TEST_F( PieceTableTest, ComplexCaseOfMultipleInsertsAndDeletes )
 {
     PieceTable pieceTable( createTempFile( "The quick brown fox jumps over the lazy dog." ) );
-    pieceTable.remove( 16, 19 );  // Remove "fox jumps over the lazy "
+    pieceTable.remove( 16, 19 );
     ASSERT_EQ( pieceTable.getText(), "The quick brown lazy dog." );
-    pieceTable.insert( 16, "cat " );  // Insert "cat "
+    pieceTable.insert( 16, "cat " );
     ASSERT_EQ( pieceTable.getText(), "The quick brown cat lazy dog." );
-    pieceTable.insert( 20, "sly " );  // Insert "sly "
+    pieceTable.insert( 20, "sly " );
     ASSERT_EQ( pieceTable.getText(), "The quick brown cat sly lazy dog." );
-    pieceTable.remove( 4, 6 );  // Remove "quick "
+    pieceTable.remove( 4, 6 );
     EXPECT_EQ( pieceTable.getText(), "The brown cat sly lazy dog." );
-    pieceTable.remove( 0, 4 );  // Remove "The "
+    pieceTable.remove( 0, 4 );
     EXPECT_EQ( pieceTable.getText(), "brown cat sly lazy dog." );
-    pieceTable.remove( pieceTable.size() - 1, 1 );  // Remove "."
+    pieceTable.remove( pieceTable.size() - 1, 1 );
     EXPECT_EQ( pieceTable.getText(), "brown cat sly lazy dog" );
-    EXPECT_EQ( pieceTable.getSubstr( 6, 3 ), "cat" );  // Test getSubstr
-    pieceTable.insert( pieceTable.size(), "!" );       // Insert "!" at the end
+    EXPECT_EQ( pieceTable.getSubstr( 6, 3 ), "cat" );
+    pieceTable.insert( pieceTable.size(), "!" );
     EXPECT_EQ( pieceTable.getText(), "brown cat sly lazy dog!" );
-    EXPECT_EQ( pieceTable.getSubstr( 6, 3 ), "cat" );  // Test getSubstr
+    EXPECT_EQ( pieceTable.getSubstr( 6, 3 ), "cat" );
 }
 
 TEST_F( PieceTableTest, FindAllWithEmptyPatternOrEmptyTable )
@@ -536,7 +512,7 @@ TEST_F( PieceTableTest, ReplaceAllConsecutiveOccurrences )
 TEST_F( PieceTableTest, ReplaceAllMassiveFragmentation )
 {
     PieceTable pieceTable;
-    for( int i = 0; i < 5; i++ ) {
+    for( int idx = 0; idx < 5; idx++ ) {
         pieceTable.insert( pieceTable.size(), "A " );
     }
 
@@ -548,156 +524,140 @@ TEST_F( PieceTableTest, ReplaceAllMassiveFragmentation )
 
 TEST_F( PieceTableTest, UndoRedoEmptyHistory )
 {
-    PieceTable pt( createTempFile( "Base Text" ) );
+    PieceTable testTable( createTempFile( "Base Text" ) );
 
-    EXPECT_FALSE( pt.canUndo() );
-    EXPECT_FALSE( pt.canRedo() );
+    EXPECT_FALSE( testTable.canUndo() );
+    EXPECT_FALSE( testTable.canRedo() );
 
-    EXPECT_FALSE( pt.undo() );
-    EXPECT_FALSE( pt.redo() );
+    EXPECT_FALSE( testTable.undo() );
+    EXPECT_FALSE( testTable.redo() );
 
-    EXPECT_EQ( pt.getText(), "Base Text" );
+    EXPECT_EQ( testTable.getText(), "Base Text" );
 }
 
 TEST_F( PieceTableTest, RedoInvalidationOnNewAction )
 {
-    PieceTable pt;
-    pt.insert( 0, "A" );
-    pt.insert( 1, "B" );
+    PieceTable testTable;
+    testTable.insert( 0, "A" );
+    testTable.insert( 1, "B" );
 
-    EXPECT_TRUE( pt.undo() );
-    EXPECT_TRUE( pt.canRedo() );
+    EXPECT_TRUE( testTable.undo() );
+    EXPECT_TRUE( testTable.canRedo() );
 
-    pt.insert( 1, "C" );
+    testTable.insert( 1, "C" );
 
-    EXPECT_FALSE( pt.canRedo() );
-    EXPECT_FALSE( pt.redo() );
+    EXPECT_FALSE( testTable.canRedo() );
+    EXPECT_FALSE( testTable.redo() );
 
-    EXPECT_EQ( pt.getText(), "AC" );
+    EXPECT_EQ( testTable.getText(), "AC" );
 }
 
 TEST_F( PieceTableTest, HistorySizeLimitEnforcement )
 {
-    PieceTable pt;
+    PieceTable testTable;
 
-    for( int i = 0; i < 105; ++i ) {
-        pt.insert( pt.size(), "X" );
+    for( int idx = 0; idx < 105; ++idx ) {
+        testTable.insert( testTable.size(), "X" );
     }
 
-    EXPECT_EQ( pt.size(), 105 );
+    EXPECT_EQ( testTable.size(), 105 );
 
     int successfulUndos = 0;
-    while( pt.undo() ) {
+    while( testTable.undo() ) {
         successfulUndos++;
     }
 
     EXPECT_EQ( successfulUndos, 100 );
-    EXPECT_EQ( pt.size(), 5 );
-    EXPECT_EQ( pt.getText(), "XXXXX" );
+    EXPECT_EQ( testTable.size(), 5 );
+    EXPECT_EQ( testTable.getText(), "XXXXX" );
 }
 
 TEST_F( PieceTableTest, UndoReplaceAllMassiveOperation )
 {
-    PieceTable pt( createTempFile( "cat dog cat dog cat" ) );
-    pt.replaceAll( "cat", "bird" );
+    PieceTable testTable( createTempFile( "cat dog cat dog cat" ) );
+    testTable.replaceAll( "cat", "bird" );
 
-    EXPECT_EQ( pt.getText(), "bird dog bird dog bird" );
-    EXPECT_TRUE( pt.canUndo() );
+    EXPECT_EQ( testTable.getText(), "bird dog bird dog bird" );
+    EXPECT_TRUE( testTable.canUndo() );
 
-    pt.undo();
-    EXPECT_EQ( pt.getText(), "cat dog cat dog cat" );
+    testTable.undo();
+    EXPECT_EQ( testTable.getText(), "cat dog cat dog cat" );
 
-    pt.redo();
-    EXPECT_EQ( pt.getText(), "bird dog bird dog bird" );
+    testTable.redo();
+    EXPECT_EQ( testTable.getText(), "bird dog bird dog bird" );
 }
 
 TEST_F( PieceTableTest, ComplexSessionPingPong )
 {
-    PieceTable pt( createTempFile( "Start" ) );
+    PieceTable testTable( createTempFile( "Start" ) );
 
-    pt.insert( 5, " A" );
-    pt.insert( 7, " B" );
-    pt.remove( 0, 5 );
+    testTable.insert( 5, " A" );
+    testTable.insert( 7, " B" );
+    testTable.remove( 0, 5 );
 
-    pt.undo();
-    EXPECT_EQ( pt.getText(), "Start A B" );
+    testTable.undo();
+    EXPECT_EQ( testTable.getText(), "Start A B" );
 
-    pt.undo();
-    EXPECT_EQ( pt.getText(), "Start A" );
+    testTable.undo();
+    EXPECT_EQ( testTable.getText(), "Start A" );
 
-    pt.redo();
-    EXPECT_EQ( pt.getText(), "Start A B" );
+    testTable.redo();
+    EXPECT_EQ( testTable.getText(), "Start A B" );
 
-    pt.insert( 9, " C" );
-    EXPECT_EQ( pt.getText(), "Start A B C" );
+    testTable.insert( 9, " C" );
+    EXPECT_EQ( testTable.getText(), "Start A B C" );
 
-    EXPECT_FALSE( pt.canRedo() );
+    EXPECT_FALSE( testTable.canRedo() );
 }
 
 TEST_F( PieceTableTest, IsDirtyFlagBehavior )
 {
-    PieceTable pt( createTempFile( "Clean text" ) );
+    PieceTable testTable( createTempFile( "Clean text" ) );
 
-    // Initially not dirty (matches the saved state)
-    EXPECT_FALSE( pt.isDirty() );
+    EXPECT_FALSE( testTable.isDirty() );
 
-    pt.insert( 10, " added" );
-    EXPECT_TRUE( pt.isDirty() );
+    testTable.insert( 10, " added" );
+    EXPECT_TRUE( testTable.isDirty() );
 
-    pt.undo();
-    // After undoing, it should be back to the saved state (not dirty)
-    EXPECT_FALSE( pt.isDirty() );
+    testTable.undo();
+    EXPECT_FALSE( testTable.isDirty() );
 
-    pt.redo();
-    EXPECT_TRUE( pt.isDirty() );
+    testTable.redo();
+    EXPECT_TRUE( testTable.isDirty() );
 
-    // Save the file
     std::string savePath = tempFilePath_ + "_saved.txt";
-    EXPECT_TRUE( pt.saveToFile( savePath ) );
+    EXPECT_TRUE( testTable.saveToFile( savePath ) );
 
-    // After saving, it is no longer dirty
-    EXPECT_FALSE( pt.isDirty() );
+    EXPECT_FALSE( testTable.isDirty() );
     std::remove( savePath.c_str() );
 }
 
 TEST_F( PieceTableTest, GetFragmentsInRange )
 {
-    PieceTable pt( createTempFile( "BaseText" ) );
-    pt.insert( 4, "NEW" );  // "BaseNEWText"
+    PieceTable testTable( createTempFile( "BaseText" ) );
+    testTable.insert( 4, "NEW" );
 
-    // Request a range that spans exactly across all 3 pieces:
-    // "seNEWTe" -> starts at index 2, length 7
-    auto fragments = pt.getFragmentsInRange( 2, 7 );
+    auto fragments = testTable.getFragmentsInRange( 2, 7 );
 
     ASSERT_EQ( fragments.size(), 3 );
 
-    // Fragment 1: "se" (from Original)
     EXPECT_EQ( fragments[0].type_, PieceTable::BufferType::Original );
     EXPECT_EQ( fragments[0].length_, 2 );
 
-    // Fragment 2: "NEW" (from Add)
     EXPECT_EQ( fragments[1].type_, PieceTable::BufferType::Add );
     EXPECT_EQ( fragments[1].length_, 3 );
 
-    // Fragment 3: "Te" (from Original)
     EXPECT_EQ( fragments[2].type_, PieceTable::BufferType::Original );
     EXPECT_EQ( fragments[2].length_, 2 );
 }
 
 TEST_F( PieceTableTest, MoveSemanticsTransferOwnership )
 {
-    PieceTable pt1( createTempFile( "Move Me" ) );
-    pt1.insert( 7, "!" );
+    PieceTable table1( createTempFile( "Move Me" ) );
+    table1.insert( 7, "!" );
 
-    // Move pt1 into pt2
-    PieceTable pt2 = std::move( pt1 );
+    PieceTable table2 = std::move( table1 );
 
-    // pt2 should have the data
-    EXPECT_EQ( pt2.size(), 8 );
-    EXPECT_EQ( pt2.getText(), "Move Me!" );
-
-    // pt1 should be safely zeroed out (size 0, no crashes on destruction)
-    EXPECT_EQ( pt1.size(), 0 );
+    EXPECT_EQ( table2.size(), 8 );
+    EXPECT_EQ( table2.getText(), "Move Me!" );
 }
-
-// NOLINTEND(readability-magic-numbers)

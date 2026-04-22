@@ -1,6 +1,7 @@
 /**
- * Author: Tomasz Okon
- * Description: Application entry point.
+ * @file Main.cc
+ * @author Tomasz Okon
+ * @brief Application entry point.
  */
 
 #include <QApplication>

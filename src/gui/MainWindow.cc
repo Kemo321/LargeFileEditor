@@ -7,9 +7,18 @@
 #include <QFileInfo>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QStatusBar>
 #include <QTimer>
-#include <QScrollBar>
+
+static constexpr int kDefaultWindowWidth = 800;
+static constexpr int kDefaultWindowHeight = 600;
+static constexpr int kProgressBarWidth = 200;
+static constexpr int kProgressBarHeight = 14;
+static constexpr int kFontSizeSmall = 8;
+static constexpr int kFontSizeMedium = 11;
+static constexpr int kFontSizeLarge = 14;
+static constexpr int kStatusClearDelayMs = 2000;
 
 MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filename_( "Untitled" )
 {
@@ -29,17 +38,19 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     createMenus();
     createStatusBar();
 
-    QTimer *cursorTimer = new QTimer(this);
-    connect(cursorTimer, &QTimer::timeout, this, [this]() {
-    });
-    cursorTimer->start(100);
+    save_watcher_ = new QFutureWatcher<bool>( this );
+    connect( save_watcher_, &QFutureWatcher<bool>::finished, this, &MainWindow::onSaveFinished );
+
+    find_watcher_ = new QFutureWatcher<std::vector<uint64_t>>( this );
+    connect( find_watcher_, &QFutureWatcher<std::vector<uint64_t>>::finished, this,
+             &MainWindow::onFindFinished );
 
     setWindowModified( false );
     updateWindowTitle();
-    resize( 800, 600 );
+    resize( kDefaultWindowWidth, kDefaultWindowHeight );
 }
 
-void MainWindow::createActions()
+auto MainWindow::createActions() -> void
 {
     open_act_ = new QAction( "&Open...", this );
     open_act_->setShortcuts( QKeySequence::Open );
@@ -89,7 +100,7 @@ void MainWindow::createActions()
     font_medium_act_->setChecked( true );
 }
 
-void MainWindow::createMenus()
+auto MainWindow::createMenus() -> void
 {
     QMenu* fileMenu = menuBar()->addMenu( "&File" );
     fileMenu->addAction( open_act_ );
@@ -113,11 +124,11 @@ void MainWindow::createMenus()
     fontSizeMenu->addAction( font_large_act_ );
 }
 
-void MainWindow::createStatusBar()
+auto MainWindow::createStatusBar() -> void
 {
     task_progress_bar_ = new QProgressBar( this );
-    task_progress_bar_->setMaximumWidth( 200 );
-    task_progress_bar_->setMaximumHeight( 14 );
+    task_progress_bar_->setMaximumWidth( kProgressBarWidth );
+    task_progress_bar_->setMaximumHeight( kProgressBarHeight );
     task_progress_bar_->hide();
 
     task_status_label_ = new QLabel( "Ready", this );
@@ -129,7 +140,7 @@ void MainWindow::createStatusBar()
     statusBar()->addPermanentWidget( cursor_pos_label_ );
 }
 
-void MainWindow::updateWindowTitle()
+auto MainWindow::updateWindowTitle() -> void
 {
     setWindowFilePath( current_filename_ );
     QString displayName =
@@ -137,31 +148,31 @@ void MainWindow::updateWindowTitle()
     setWindowTitle( QString( "[*]%1 - LargeFileEditor" ).arg( displayName ) );
 }
 
-void MainWindow::setFontSizeSmall()
+auto MainWindow::setFontSizeSmall() -> void
 {
-    viewer_->setFont( QFont( viewer_->font().family(), 8 ) );
-    task_status_label_->setText("Font size set to Small");
+    viewer_->setFont( QFont( viewer_->font().family(), kFontSizeSmall ) );
+    task_status_label_->setText( "Font size set to Small" );
 }
 
-void MainWindow::setFontSizeMedium()
+auto MainWindow::setFontSizeMedium() -> void
 {
-    viewer_->setFont( QFont( viewer_->font().family(), 11 ) );
-    task_status_label_->setText("Font size set to Medium");
+    viewer_->setFont( QFont( viewer_->font().family(), kFontSizeMedium ) );
+    task_status_label_->setText( "Font size set to Medium" );
 }
 
-void MainWindow::setFontSizeLarge()
+auto MainWindow::setFontSizeLarge() -> void
 {
-    viewer_->setFont( QFont( viewer_->font().family(), 14 ) );
-    task_status_label_->setText("Font size set to Large");
+    viewer_->setFont( QFont( viewer_->font().family(), kFontSizeLarge ) );
+    task_status_label_->setText( "Font size set to Large" );
 }
 
-void MainWindow::openFile()
+auto MainWindow::openFile() -> void
 {
     QString fileName = QFileDialog::getOpenFileName( this, "Open File", "", "All Files (*)" );
     if( !fileName.isEmpty() ) {
-        task_status_label_->setText("Opening file...");
+        task_status_label_->setText( "Opening file..." );
         task_progress_bar_->show();
-        task_progress_bar_->setRange(0, 0); // Infinite pulse
+        task_progress_bar_->setRange( 0, 0 );
 
         current_filename_ = fileName;
         current_find_text_ = "";
@@ -174,41 +185,57 @@ void MainWindow::openFile()
             viewer_->setMockHighlights( QStringList{} );
             setWindowModified( false );
             updateWindowTitle();
-            task_status_label_->setText(QString("Loaded: %1").arg(QFileInfo(fileName).fileName()));
-        } catch (...) {
-            task_status_label_->setText("Error: Failed to open file");
-            QMessageBox::critical(this, "Error", "Could not open the file.");
+            task_status_label_->setText(
+                QString( "Loaded: %1" ).arg( QFileInfo( fileName ).fileName() ) );
+        } catch( ... ) {
+            task_status_label_->setText( "Error: Failed to open file" );
+            QMessageBox::critical( this, "Error", "Could not open the file." );
         }
 
         task_progress_bar_->hide();
     }
 }
 
-void MainWindow::saveFile()
+auto MainWindow::saveFile() -> void
 {
-    if( !piece_table_ ) {
+    if( !piece_table_ || save_watcher_->isRunning() ) {
         return;
     }
 
+    viewer_->setEnabled( false );
+    save_act_->setEnabled( false );
+    open_act_->setEnabled( false );
+
     task_progress_bar_->show();
-    task_progress_bar_->setRange( 0, 100 );
-    task_progress_bar_->setValue(50);
-    task_status_label_->setText( "Saving..." );
+    task_progress_bar_->setRange( 0, 0 );
+    task_status_label_->setText( "Saving in background..." );
 
-    QString tempFileName = current_filename_ + ".tmp";
+    pending_temp_filename_ = current_filename_ + ".tmp";
 
-    if( piece_table_->saveToFile( tempFileName.toStdString() ) ) {
-        
-        if ( QFile::exists( current_filename_ ) && !QFile::remove( current_filename_ ) ) {
-            QFile::remove( tempFileName );
+    QFuture<bool> future = QtConcurrent::run(
+        [this]() { return piece_table_->saveToFile( pending_temp_filename_.toStdString() ); } );
+
+    save_watcher_->setFuture( future );
+}
+
+auto MainWindow::onSaveFinished() -> void
+{
+    bool success = save_watcher_->result();
+    task_progress_bar_->hide();
+
+    viewer_->setEnabled( true );
+    save_act_->setEnabled( true );
+    open_act_->setEnabled( true );
+
+    if( success ) {
+        if( QFile::exists( current_filename_ ) && !QFile::remove( current_filename_ ) ) {
+            QFile::remove( pending_temp_filename_ );
             task_status_label_->setText( "Save error: Access denied" );
-            task_progress_bar_->hide();
             return;
         }
 
-        if ( !QFile::rename( tempFileName, current_filename_ ) ) {
+        if( !QFile::rename( pending_temp_filename_, current_filename_ ) ) {
             task_status_label_->setText( "Save error: Rename failed" );
-            task_progress_bar_->hide();
             return;
         }
 
@@ -219,19 +246,19 @@ void MainWindow::saveFile()
 
         setWindowModified( false );
         task_status_label_->setText( "File saved successfully" );
-        task_progress_bar_->setValue(100);
     } else {
         task_status_label_->setText( "Critical: Save failed" );
+        QMessageBox::warning( this, "Save", "Failed to save file." );
     }
 
-    QTimer::singleShot( 2000, this, [this]() {
-        task_progress_bar_->hide();
-        if (task_status_label_->text().contains("successfully"))
+    QTimer::singleShot( kStatusClearDelayMs, this, [this]() {
+        if( task_status_label_->text().contains( "successfully" ) ) {
             task_status_label_->setText( "Ready" );
+        }
     } );
 }
 
-void MainWindow::saveFileAs()
+auto MainWindow::saveFileAs() -> void
 {
     if( !piece_table_ ) {
         return;
@@ -239,69 +266,92 @@ void MainWindow::saveFileAs()
 
     QString fileName = QFileDialog::getSaveFileName( this, "Save File As", "", "All Files (*)" );
     if( !fileName.isEmpty() ) {
-        task_status_label_->setText("Saving as...");
+        task_status_label_->setText( "Saving as..." );
         if( piece_table_->saveToFile( fileName.toStdString() ) ) {
             current_filename_ = fileName;
             setWindowModified( false );
             updateWindowTitle();
-            task_status_label_->setText("File saved as: " + QFileInfo(fileName).fileName());
+            task_status_label_->setText( "File saved as: " + QFileInfo( fileName ).fileName() );
         } else {
-            task_status_label_->setText("Save As failed!");
+            task_status_label_->setText( "Save As failed!" );
         }
     }
 }
 
-void MainWindow::findText()
+auto MainWindow::findText() -> void
 {
     find_replace_dialog_->showFind();
-    task_status_label_->setText("Find dialog opened");
+    task_status_label_->setText( "Find dialog opened" );
 }
 
-void MainWindow::replaceText()
+auto MainWindow::replaceText() -> void
 {
     find_replace_dialog_->showReplace();
-    task_status_label_->setText("Replace dialog opened");
+    task_status_label_->setText( "Replace dialog opened" );
 }
 
-void MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool matchWord )
+auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool matchWord ) -> void
 {
-    if ( !piece_table_ || text.isEmpty() ) return;
+    if( !piece_table_ || text.isEmpty() || find_watcher_->isRunning() ) {
+        return;
+    }
 
     static bool lastMatchCase = matchCase;
     static bool lastMatchWord = matchWord;
 
-    if ( text != current_find_text_ || matchCase != lastMatchCase || matchWord != lastMatchWord ) {
+    if( text != current_find_text_ || matchCase != lastMatchCase || matchWord != lastMatchWord ) {
         current_find_text_ = text;
         lastMatchCase = matchCase;
         lastMatchWord = matchWord;
-        
-        current_find_results_ = piece_table_->findAll( text.toStdString(), matchCase, matchWord );
-        current_find_index_ = -1;
-    }
 
-    if ( current_find_results_.empty() ) {
-        task_status_label_->setText(QString("No matches for '%1'").arg(text));
+        task_progress_bar_->show();
+        task_progress_bar_->setRange( 0, 0 );
+        task_status_label_->setText( "Searching..." );
+
+        QFuture<std::vector<uint64_t>> future =
+            QtConcurrent::run( [this, text, matchCase, matchWord]() {
+                return piece_table_->findAll( text.toStdString(), matchCase, matchWord );
+            } );
+
+        find_watcher_->setFuture( future );
+    } else {
+        processFindResults();
+    }
+}
+
+auto MainWindow::onFindFinished() -> void
+{
+    task_progress_bar_->hide();
+    current_find_results_ = find_watcher_->result();
+    current_find_index_ = -1;
+    processFindResults();
+}
+
+auto MainWindow::processFindResults() -> void
+{
+    if( current_find_results_.empty() ) {
+        task_status_label_->setText( QString( "No matches for '%1'" ).arg( current_find_text_ ) );
         QMessageBox::information( find_replace_dialog_, "Find", "Text not found." );
         return;
     }
 
     current_find_index_++;
-    if ( current_find_index_ >= static_cast<int>( current_find_results_.size() ) ) {
-        current_find_index_ = 0; 
-        task_status_label_->setText("Search wrapped to top");
+    if( current_find_index_ >= static_cast<int>( current_find_results_.size() ) ) {
+        current_find_index_ = 0;
+        task_status_label_->setText( "Search wrapped to top" );
     }
 
     uint64_t targetPos = current_find_results_[current_find_index_];
     viewer_->jumpToLogicalPosition( targetPos );
-    viewer_->setMockHighlights( QStringList{ text } );
-    
+    viewer_->setMockHighlights( QStringList{ current_find_text_ } );
+
     task_status_label_->setText( QString( "Match %1 of %2" )
-        .arg( current_find_index_ + 1 )
-        .arg( current_find_results_.size() ) );
+                                     .arg( current_find_index_ + 1 )
+                                     .arg( current_find_results_.size() ) );
 }
 
-void MainWindow::onReplaceNextRequested( const QString& findText, const QString& replaceText,
-                                         bool matchCase, bool matchWord )
+auto MainWindow::onReplaceNextRequested( const QString& findText, const QString& replaceText,
+                                         bool matchCase, bool matchWord ) -> void
 {
     if( !piece_table_ || findText.isEmpty() ) {
         return;
@@ -309,7 +359,7 @@ void MainWindow::onReplaceNextRequested( const QString& findText, const QString&
 
     if( findText != current_find_text_ || current_find_index_ < 0 ) {
         onFindNextRequested( findText, matchCase, matchWord );
-        if( current_find_index_ < 0 ) return;
+        return;
     }
 
     uint64_t pos = current_find_results_[current_find_index_];
@@ -320,16 +370,17 @@ void MainWindow::onReplaceNextRequested( const QString& findText, const QString&
     setWindowModified( true );
     task_status_label_->setText( "Occurrence replaced" );
 
-    int offsetShift = replaceText.length() - findText.length();
-    for( size_t i = current_find_index_ + 1; i < current_find_results_.size(); ++i ) {
-        current_find_results_[i] += offsetShift;
+    int offsetShift =
+        static_cast<int>( replaceText.length() ) - static_cast<int>( findText.length() );
+    for( size_t idx = current_find_index_ + 1; idx < current_find_results_.size(); ++idx ) {
+        current_find_results_[idx] += static_cast<uint64_t>( offsetShift );
     }
 
     onFindNextRequested( findText, matchCase, matchWord );
 }
 
-void MainWindow::onReplaceAllRequested( const QString& findText, const QString& replaceText,
-                                        bool matchCase, bool matchWord )
+auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& replaceText,
+                                        bool matchCase, bool matchWord ) -> void
 {
     if( !piece_table_ || findText.isEmpty() ) {
         return;
@@ -341,10 +392,11 @@ void MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
     if( replaced > 0 ) {
         viewer_->refreshView();
         current_find_text_ = "";
-        task_status_label_->setText( QString( "Successfully replaced %1 occurrences" ).arg( replaced ) );
+        task_status_label_->setText(
+            QString( "Successfully replaced %1 occurrences" ).arg( replaced ) );
         setWindowModified( true );
     } else {
-        task_status_label_->setText("Replace All: No matches found");
+        task_status_label_->setText( "Replace All: No matches found" );
         QMessageBox::information( this, "Replace All", "Text not found." );
     }
 }

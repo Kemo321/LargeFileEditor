@@ -8,6 +8,13 @@
 #include <QWheelEvent>
 #include <algorithm>
 
+static constexpr int kCursorBlinkRateMs = 500;
+static constexpr int kLineOffsetDelayMs = 300;
+static constexpr int kLineHeightPadding = 5;
+static constexpr int kGutterTextPadding = 10;
+static constexpr int kScrollStepDivisor = 120;
+static constexpr int kWheelMultiplier = 3;
+
 LargeFileViewer::LargeFileViewer( QWidget* parent ) : QAbstractScrollArea( parent )
 {
     viewport()->setBackgroundRole( QPalette::Base );
@@ -18,7 +25,7 @@ LargeFileViewer::LargeFileViewer( QWidget* parent ) : QAbstractScrollArea( paren
 
     cursor_timer_ = new QTimer( this );
     connect( cursor_timer_, &QTimer::timeout, this, &LargeFileViewer::blinkCursor );
-    cursor_timer_->start( 500 );
+    cursor_timer_->start( kCursorBlinkRateMs );
 
     line_offset_timer_ = new QTimer( this );
     line_offset_timer_->setSingleShot( true );
@@ -39,25 +46,25 @@ auto LargeFileViewer::eventFilter( QObject* obj, QEvent* event ) -> bool
     return QAbstractScrollArea::eventFilter( obj, event );
 }
 
-void LargeFileViewer::resizeEvent( QResizeEvent* event )
+auto LargeFileViewer::resizeEvent( QResizeEvent* event ) -> void
 {
     QAbstractScrollArea::resizeEvent( event );
     refreshLineOffsets();
 }
 
-void LargeFileViewer::invalidateCache()
+auto LargeFileViewer::invalidateCache() -> void
 {
     line_cache_.clear();
 }
 
-void LargeFileViewer::refreshView()
+auto LargeFileViewer::refreshView() -> void
 {
     invalidateCache();
     refreshLineOffsets();
     viewport()->update();
 }
 
-void LargeFileViewer::jumpToLogicalPosition( uint64_t pos )
+auto LargeFileViewer::jumpToLogicalPosition( uint64_t pos ) -> void
 {
     if( piece_table_ == nullptr ) {
         return;
@@ -67,19 +74,19 @@ void LargeFileViewer::jumpToLogicalPosition( uint64_t pos )
     setCursorPosition( line, col );
 }
 
-void LargeFileViewer::blinkCursor()
+auto LargeFileViewer::blinkCursor() -> void
 {
     cursor_visible_ = !cursor_visible_;
     viewport()->update();
 }
 
-void LargeFileViewer::setMockHighlights( const QStringList& words )
+auto LargeFileViewer::setMockHighlights( const QStringList& words ) -> void
 {
     mock_highlight_words_ = words;
     viewport()->update();
 }
 
-void LargeFileViewer::onScrollbarMoved( int value )
+auto LargeFileViewer::onScrollbarMoved( int value ) -> void
 {
     QScrollBar* vBar = verticalScrollBar();
     if( vBar->maximum() > 0 ) {
@@ -89,15 +96,15 @@ void LargeFileViewer::onScrollbarMoved( int value )
     }
 }
 
-void LargeFileViewer::refreshLineOffsets()
+auto LargeFileViewer::refreshLineOffsets() -> void
 {
     if( piece_table_ == nullptr ) {
         return;
     }
 
     int totalLines = piece_table_->getLineCount();
-    QFontMetrics fm( font() );
-    int lineHeight = fm.height() + 5;
+    QFontMetrics fontMetrics( font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
     int visibleLines = viewport()->height() / lineHeight;
 
     verticalScrollBar()->setSingleStep( 1 );
@@ -105,7 +112,7 @@ void LargeFileViewer::refreshLineOffsets()
     verticalScrollBar()->setRange( 0, std::max( 0, totalLines - visibleLines ) );
 }
 
-void LargeFileViewer::setPieceTable( PieceTable* pieceTable )
+auto LargeFileViewer::setPieceTable( PieceTable* pieceTable ) -> void
 {
     piece_table_ = pieceTable;
     cursor_line_ = 0;
@@ -142,9 +149,9 @@ auto LargeFileViewer::getLineText( int line ) const -> QString
 
 auto LargeFileViewer::getLineTextCached( int line ) -> QString
 {
-    for( const auto& cl : line_cache_ ) {
-        if( cl.line == line ) {
-            return cl.text;
+    for( const auto& cls : line_cache_ ) {
+        if( cls.line_ == line ) {
+            return cls.text_;
         }
     }
     QString text = getLineText( line );
@@ -160,24 +167,24 @@ auto LargeFileViewer::getLogicalPosition( int line, int col ) const -> uint64_t
     return piece_table_->getLineStart( line ) + col;
 }
 
-void LargeFileViewer::setCursorPosition( int line, int col )
+auto LargeFileViewer::setCursorPosition( int line, int col ) -> void
 {
     if( piece_table_ == nullptr ) {
         return;
     }
     cursor_line_ = std::max( 0, std::min( line, piece_table_->getLineCount() - 1 ) );
-    int lineLen = getLineTextCached( cursor_line_ ).length();
+    int lineLen = static_cast<int>( getLineTextCached( cursor_line_ ).length() );
     cursor_col_ = std::max( 0, std::min( col, lineLen ) );
     cursor_visible_ = true;
     scrollToCursor();
     viewport()->update();
 }
 
-void LargeFileViewer::scrollToCursor()
+auto LargeFileViewer::scrollToCursor() -> void
 {
     int currentScroll = verticalScrollBar()->value();
-    QFontMetrics fm( font() );
-    int lineHeight = fm.height() + 5;
+    QFontMetrics fontMetrics( font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
     int visibleLinesCount = viewport()->height() / lineHeight;
 
     if( cursor_line_ < currentScroll ) {
@@ -187,7 +194,8 @@ void LargeFileViewer::scrollToCursor()
     }
 }
 
-void LargeFileViewer::keyPressEvent( QKeyEvent* event )
+// NOLINTBEGIN
+auto LargeFileViewer::keyPressEvent( QKeyEvent* event ) -> void
 {
     if( piece_table_ == nullptr ) {
         return;
@@ -202,7 +210,7 @@ void LargeFileViewer::keyPressEvent( QKeyEvent* event )
             cursor_col_--;
         } else if( cursor_line_ > 0 ) {
             cursor_line_--;
-            cursor_col_ = getLineTextCached( cursor_line_ ).length();
+            cursor_col_ = static_cast<int>( getLineTextCached( cursor_line_ ).length() );
         }
     } else if( key == Qt::Key_Right ) {
         if( cursor_col_ < getLineTextCached( cursor_line_ ).length() ) {
@@ -214,14 +222,14 @@ void LargeFileViewer::keyPressEvent( QKeyEvent* event )
     } else if( key == Qt::Key_Up ) {
         if( cursor_line_ > 0 ) {
             cursor_line_--;
-            cursor_col_ =
-                std::min( cursor_col_, static_cast<int>( getLineTextCached( cursor_line_ ).length() ) );
+            cursor_col_ = std::min(
+                cursor_col_, static_cast<int>( getLineTextCached( cursor_line_ ).length() ) );
         }
     } else if( key == Qt::Key_Down ) {
         if( cursor_line_ < piece_table_->getLineCount() - 1 ) {
             cursor_line_++;
-            cursor_col_ =
-                std::min( cursor_col_, static_cast<int>( getLineTextCached( cursor_line_ ).length() ) );
+            cursor_col_ = std::min(
+                cursor_col_, static_cast<int>( getLineTextCached( cursor_line_ ).length() ) );
         }
     } else if( key == Qt::Key_Backspace ) {
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
@@ -232,7 +240,7 @@ void LargeFileViewer::keyPressEvent( QKeyEvent* event )
                 cursor_col_--;
             } else {
                 cursor_line_--;
-                cursor_col_ = getLineTextCached( cursor_line_ ).length();
+                cursor_col_ = static_cast<int>( getLineTextCached( cursor_line_ ).length() );
             }
         }
     } else if( key == Qt::Key_Delete ) {
@@ -251,10 +259,10 @@ void LargeFileViewer::keyPressEvent( QKeyEvent* event )
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         piece_table_->insert( pos, text.toStdString() );
         tableModified = true;
-        cursor_col_ += text.length();
+        cursor_col_ += static_cast<int>( text.length() );
     }
 
-    if (tableModified) {
+    if( tableModified ) {
         invalidateCache();
     }
 
@@ -263,31 +271,32 @@ void LargeFileViewer::keyPressEvent( QKeyEvent* event )
     refreshLineOffsets();
     viewport()->update();
 
-    line_offset_timer_->start( 300 );
+    line_offset_timer_->start( kLineOffsetDelayMs );
 }
+// NOLINTEND
 
-void LargeFileViewer::mousePressEvent( QMouseEvent* event )
+auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
 {
     if( piece_table_ == nullptr ) {
         return;
     }
 
-    QFontMetrics fm( font() );
-    int lineHeight = fm.height() + 5;
+    QFontMetrics fontMetrics( font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
 
-    int clickedLineOffset = event->position().y() / lineHeight;
+    int clickedLineOffset = static_cast<int>( event->position().y() ) / lineHeight;
     int targetLine = verticalScrollBar()->value() + clickedLineOffset;
 
     if( targetLine < piece_table_->getLineCount() ) {
         cursor_line_ = targetLine;
         QString lineText = getLineTextCached( cursor_line_ );
 
-        int textX = event->position().x() - gutter_width_ - 10;
+        int textX = static_cast<int>( event->position().x() ) - gutter_width_ - kGutterTextPadding;
         int col = 0;
         int currentX = 0;
 
         while( col < lineText.length() ) {
-            int charWidth = fm.horizontalAdvance( lineText.at( col ) );
+            int charWidth = fontMetrics.horizontalAdvance( lineText.at( col ) );
             if( currentX + charWidth / 2 > textX ) {
                 break;
             }
@@ -301,7 +310,7 @@ void LargeFileViewer::mousePressEvent( QMouseEvent* event )
     viewport()->update();
 }
 
-void LargeFileViewer::paintViewport( QPaintEvent* event )
+auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
 {
     QPainter painter( viewport() );
     painter.fillRect( event->rect(), Qt::white );
@@ -314,41 +323,43 @@ void LargeFileViewer::paintViewport( QPaintEvent* event )
         return;
     }
 
-    QFontMetrics fm( painter.font() );
-    int lineHeight = fm.height() + 5;
+    QFontMetrics fontMetrics( painter.font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
     int startLine = verticalScrollBar()->value();
     int visibleLinesCount = ( viewport()->height() / lineHeight ) + 1;
     int totalLines = piece_table_->getLineCount();
 
-    for( int i = 0; i < visibleLinesCount; ++i ) {
-        int currentLineIndex = startLine + i;
+    for( int idx = 0; idx < visibleLinesCount; ++idx ) {
+        int currentLineIndex = startLine + idx;
         if( currentLineIndex >= totalLines ) {
             break;
         }
 
         QString lineText = getLineTextCached( currentLineIndex );
-        int yBase = i * lineHeight;
-        int yText = yBase + fm.ascent() + 2;
+        int yBase = idx * lineHeight;
+        int yText = yBase + fontMetrics.ascent() + 2;
 
         painter.setPen( QColor( "#808080" ) );
-        painter.drawText( QRect( 0, yBase, gutter_width_ - 5, lineHeight ),
-                          Qt::AlignRight | Qt::AlignVCenter,
+        painter.drawText( QRect( 0, yBase, gutter_width_ - kLineHeightPadding, lineHeight ),
+                          static_cast<int>( Qt::AlignRight | Qt::AlignVCenter ),
                           QString::number( currentLineIndex + 1 ) );
 
-        int textX = gutter_width_ + 10;
+        int textX = gutter_width_ + kGutterTextPadding;
 
         if( !mock_highlight_words_.isEmpty() ) {
             for( const QString& word : mock_highlight_words_ ) {
                 if( word.isEmpty() ) {
                     continue;
                 }
-                int idx = 0;
-                while( ( idx = lineText.indexOf( word, idx, Qt::CaseInsensitive ) ) != -1 ) {
-                    int startX = textX + fm.horizontalAdvance( lineText.left( idx ) );
-                    int wordWidth = fm.horizontalAdvance( lineText.mid( idx, word.length() ) );
+                int matchIdx = 0;
+                while( ( matchIdx = lineText.indexOf( word, matchIdx, Qt::CaseInsensitive ) ) !=
+                       -1 ) {
+                    int startX = textX + fontMetrics.horizontalAdvance( lineText.left( matchIdx ) );
+                    int wordWidth = fontMetrics.horizontalAdvance(
+                        lineText.mid( matchIdx, static_cast<int>( word.length() ) ) );
                     painter.fillRect( startX, yBase + 2, wordWidth, lineHeight - 4,
                                       QColor( 255, 255, 0, 150 ) );
-                    idx += word.length();
+                    matchIdx += static_cast<int>( word.length() );
                 }
             }
         }
@@ -357,16 +368,16 @@ void LargeFileViewer::paintViewport( QPaintEvent* event )
         painter.drawText( textX, yText, lineText );
 
         if( currentLineIndex == cursor_line_ && hasFocus() && cursor_visible_ ) {
-            int cursorX = textX + fm.horizontalAdvance( lineText.left( cursor_col_ ) );
+            int cursorX = textX + fontMetrics.horizontalAdvance( lineText.left( cursor_col_ ) );
             painter.setPen( Qt::black );
             painter.drawLine( cursorX, yBase + 2, cursorX, yBase + lineHeight - 2 );
         }
     }
 }
 
-void LargeFileViewer::wheelEvent( QWheelEvent* event )
+auto LargeFileViewer::wheelEvent( QWheelEvent* event ) -> void
 {
-    int numSteps = event->angleDelta().y() / 120;
-    verticalScrollBar()->setValue( verticalScrollBar()->value() - ( numSteps * 3 ) );
+    int numSteps = event->angleDelta().y() / kScrollStepDivisor;
+    verticalScrollBar()->setValue( verticalScrollBar()->value() - ( numSteps * kWheelMultiplier ) );
     event->accept();
 }
