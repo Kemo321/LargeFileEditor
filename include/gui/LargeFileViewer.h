@@ -78,13 +78,11 @@ protected:
     auto keyPressEvent( QKeyEvent* event ) -> void override;
     auto mousePressEvent( QMouseEvent* event ) -> void override;
 
-    // cppcheck-suppress unknownMacro
-private slots:
+private:
     auto blinkCursor() -> void;
     auto onScrollbarMoved( int value ) -> void;
     auto paintViewport( QPaintEvent* event ) -> void;
 
-private:
     [[nodiscard]] auto getLogicalPosition( int line, int col ) const -> uint64_t;
     [[nodiscard]] auto getLineText( int line ) const -> QString;
     [[nodiscard]] auto getLineTextCached( int line ) -> QString;

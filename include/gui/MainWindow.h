@@ -37,14 +37,12 @@ public:
     explicit MainWindow( QWidget* parent = nullptr );
     ~MainWindow() override = default;
 
-private slots:
+private:
     auto openFile() -> void;
     auto saveFile() -> void;
     auto saveFileAs() -> void;
     auto findText() -> void;
     auto replaceText() -> void;
-
-private:
 
     auto onFindNextRequested( const QString& text, bool matchCase, bool matchWord ) -> void;
     auto onReplaceNextRequested( const QString& findText, const QString& replaceText,
