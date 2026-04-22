@@ -661,3 +661,35 @@ TEST_F( PieceTableTest, MoveSemanticsTransferOwnership )
     EXPECT_EQ( table2.size(), 8 );
     EXPECT_EQ( table2.getText(), "Move Me!" );
 }
+
+TEST_F( PieceTableTest, LineCountEmpty )
+{
+    PieceTable pieceTable;
+    EXPECT_EQ( pieceTable.getLineCount(), 1 );
+    EXPECT_EQ( pieceTable.getLineFromPosition( 0 ), 0 );
+}
+
+TEST_F( PieceTableTest, LineCountSimple )
+{
+    PieceTable pieceTable( createTempFile( "Line 1\nLine 2\nLine 3" ) );
+    EXPECT_EQ( pieceTable.getLineCount(), 3 );
+    EXPECT_EQ( pieceTable.getLineFromPosition( 5 ), 0 );
+    EXPECT_EQ( pieceTable.getLineFromPosition( 7 ), 1 );
+    EXPECT_EQ( pieceTable.getLineFromPosition( 14 ), 2 );
+}
+
+TEST_F( PieceTableTest, LineCountTrailingNewline )
+{
+    PieceTable pieceTable( createTempFile( "Line 1\nLine 2\n" ) );
+    EXPECT_EQ( pieceTable.getLineCount(), 3 );
+    EXPECT_EQ( pieceTable.getLineFromPosition( 14 ), 2 );
+}
+
+TEST_F( PieceTableTest, LineStarts )
+{
+    PieceTable pieceTable( createTempFile( "A\nB\nC\n" ) );
+    EXPECT_EQ( pieceTable.getLineStart( 0 ), 0 );
+    EXPECT_EQ( pieceTable.getLineStart( 1 ), 2 );
+    EXPECT_EQ( pieceTable.getLineStart( 2 ), 4 );
+    EXPECT_EQ( pieceTable.getLineStart( 3 ), 6 );
+}

@@ -80,6 +80,11 @@ signals:
      */
     void cursorPositionChanged( int line, int col );
 
+    /**
+     * @brief Emitted when the document has been modified.
+     */
+    void documentModified();
+
 protected:
     /**
      * @brief Filters events for the viewport to handle custom painting.

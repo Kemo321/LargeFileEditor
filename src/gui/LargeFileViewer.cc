@@ -266,6 +266,7 @@ auto LargeFileViewer::keyPressEvent( QKeyEvent* event ) -> void
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         if( pos > 0 ) {
             piece_table_->remove( pos - 1, 1 );
+            invalidateCache();
             tableModified = true;
             if( cursor_col_ > 0 ) {
                 cursor_col_--;
@@ -278,23 +279,26 @@ auto LargeFileViewer::keyPressEvent( QKeyEvent* event ) -> void
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         if( pos < piece_table_->size() ) {
             piece_table_->remove( pos, 1 );
+            invalidateCache();
             tableModified = true;
         }
     } else if( key == Qt::Key_Return || key == Qt::Key_Enter ) {
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         piece_table_->insert( pos, "\n" );
+        invalidateCache();
         tableModified = true;
         cursor_line_++;
         cursor_col_ = 0;
     } else if( !text.isEmpty() && text.at( 0 ).isPrint() ) {
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         piece_table_->insert( pos, text.toStdString() );
+        invalidateCache();
         tableModified = true;
         cursor_col_ += static_cast<int>( text.length() );
     }
 
     if( tableModified ) {
-        invalidateCache();
+        emit documentModified();
     }
 
     cursor_visible_ = true;

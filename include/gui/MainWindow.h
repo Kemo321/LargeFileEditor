@@ -35,7 +35,7 @@ public:
      * @param parent Pointer to parent QWidget.
      */
     explicit MainWindow( QWidget* parent = nullptr );
-    ~MainWindow() override = default;
+    ~MainWindow() override;
 
 private:
     auto openFile() -> void;
@@ -76,9 +76,6 @@ private:
     QAction* save_as_act_{};
     QAction* exit_act_{};
 
-    QAction* copy_act_{};
-    QAction* cut_act_{};
-    QAction* paste_act_{};
     QAction* find_act_{};
     QAction* replace_act_{};
 

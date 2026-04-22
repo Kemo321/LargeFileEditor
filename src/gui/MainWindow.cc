@@ -49,9 +49,19 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
         cursor_pos_label_->setText( QString( "Line %1, Col %2" ).arg( line + 1 ).arg( col + 1 ) );
     } );
 
+    connect( viewer_, &LargeFileViewer::documentModified, this,
+             [this]() { setWindowModified( true ); } );
+
     setWindowModified( false );
     updateWindowTitle();
     resize( kDefaultWindowWidth, kDefaultWindowHeight );
+}
+
+MainWindow::~MainWindow()
+{
+    if( ( save_watcher_ != nullptr ) && save_watcher_->isRunning() ) {
+        save_watcher_->waitForFinished();
+    }
 }
 
 auto MainWindow::createActions() -> void
@@ -71,10 +81,6 @@ auto MainWindow::createActions() -> void
     exit_act_ = new QAction( "E&xit", this );
     exit_act_->setShortcuts( QKeySequence::Quit );
     connect( exit_act_, &QAction::triggered, qApp, &QApplication::quit );
-
-    copy_act_ = new QAction( "&Copy", this );
-    cut_act_ = new QAction( "Cu&t", this );
-    paste_act_ = new QAction( "&Paste", this );
 
     find_act_ = new QAction( "&Find...", this );
     find_act_->setShortcuts( QKeySequence::Find );
@@ -114,10 +120,6 @@ auto MainWindow::createMenus() -> void
     fileMenu->addAction( exit_act_ );
 
     QMenu* editMenu = menuBar()->addMenu( "&Edit" );
-    editMenu->addAction( copy_act_ );
-    editMenu->addAction( cut_act_ );
-    editMenu->addAction( paste_act_ );
-    editMenu->addSeparator();
     editMenu->addAction( find_act_ );
     editMenu->addAction( replace_act_ );
 
@@ -232,16 +234,19 @@ auto MainWindow::onSaveFinished() -> void
     open_act_->setEnabled( true );
 
     if( success ) {
-        if( QFile::exists( current_filename_ ) && !QFile::remove( current_filename_ ) ) {
-            QFile::remove( pending_temp_filename_ );
-            task_status_label_->setText( "Save error: Access denied" );
-            return;
+        QString backup_filename = current_filename_ + ".bak";
+        QFile::remove( backup_filename );
+        if( QFile::exists( current_filename_ ) ) {
+            QFile::rename( current_filename_, backup_filename );
         }
 
         if( !QFile::rename( pending_temp_filename_, current_filename_ ) ) {
+            QFile::rename( backup_filename, current_filename_ );
             task_status_label_->setText( "Save error: Rename failed" );
             return;
         }
+
+        QFile::remove( backup_filename );
 
         int currentScroll = viewer_->verticalScrollBar()->value();
         piece_table_ = std::make_unique<PieceTable>( current_filename_.toStdString() );
@@ -272,6 +277,10 @@ auto MainWindow::saveFileAs() -> void
     if( !fileName.isEmpty() ) {
         task_status_label_->setText( "Saving as..." );
         if( piece_table_->saveToFile( fileName.toStdString() ) ) {
+            if( ( save_watcher_ != nullptr ) && save_watcher_->isRunning() ) {
+                save_watcher_->waitForFinished();
+            }
+
             current_filename_ = fileName;
             setWindowModified( false );
             updateWindowTitle();
@@ -312,6 +321,8 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
         task_progress_bar_->setRange( 0, 0 );
         task_status_label_->setText( "Searching..." );
 
+        viewer_->setEnabled( false );
+
         QFuture<std::vector<uint64_t>> future =
             QtConcurrent::run( [this, text, matchCase, matchWord]() {
                 return piece_table_->findAll( text.toStdString(), matchCase, matchWord );
@@ -326,6 +337,7 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
 auto MainWindow::onFindFinished() -> void
 {
     task_progress_bar_->hide();
+    viewer_->setEnabled( true );
     current_find_results_ = find_watcher_->result();
     current_find_index_ = -1;
     processFindResults();
@@ -366,16 +378,18 @@ auto MainWindow::onReplaceNextRequested( const QString& findText, const QString&
         return;
     }
 
+    int findTextLen = findText.toUtf8().length();
+    int replaceTextLen = replaceText.toUtf8().length();
+
     uint64_t pos = current_find_results_[current_find_index_];
-    piece_table_->remove( pos, findText.length() );
-    piece_table_->insert( pos, replaceText.toStdString() );
+    piece_table_->remove( pos, findTextLen );
+    piece_table_->insert( pos, replaceText.toUtf8().toStdString() );
 
     viewer_->refreshView();
     setWindowModified( true );
     task_status_label_->setText( "Occurrence replaced" );
 
-    int offsetShift =
-        static_cast<int>( replaceText.length() ) - static_cast<int>( findText.length() );
+    int offsetShift = replaceTextLen - findTextLen;
     for( size_t idx = current_find_index_ + 1; idx < current_find_results_.size(); ++idx ) {
         current_find_results_[idx] += static_cast<uint64_t>( offsetShift );
     }
@@ -390,8 +404,8 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
         return;
     }
 
-    uint64_t replaced =
-        piece_table_->replaceAll( findText.toStdString(), replaceText.toStdString() );
+    uint64_t replaced = piece_table_->replaceAll( findText.toStdString(), replaceText.toStdString(),
+                                                  matchCase, matchWord );
 
     if( replaced > 0 ) {
         viewer_->refreshView();
