@@ -33,8 +33,26 @@ LargeFileViewer::LargeFileViewer( QWidget* parent ) : QAbstractScrollArea( paren
 
     viewport()->installEventFilter( this );
 
-    connect( verticalScrollBar(), &QScrollBar::valueChanged, this,
-             [this]( int ) { viewport()->update(); } );
+    scrollbar_tooltip_ = new QLabel( this );
+    scrollbar_tooltip_->setWindowFlags( Qt::ToolTip );
+    scrollbar_tooltip_->setStyleSheet(
+        "QLabel { background-color: #ffffe0; color: black; border: 1px solid black; padding: 4px; "
+        "}" );
+    scrollbar_tooltip_->hide();
+
+    connect( verticalScrollBar(), &QScrollBar::sliderPressed, this, [this]() {
+        onScrollbarMoved( verticalScrollBar()->value() );
+        scrollbar_tooltip_->show();
+    } );
+    connect( verticalScrollBar(), &QScrollBar::sliderReleased, this,
+             [this]() { scrollbar_tooltip_->hide(); } );
+
+    connect( verticalScrollBar(), &QScrollBar::valueChanged, this, [this]( int value ) {
+        viewport()->update();
+        if( verticalScrollBar()->isSliderDown() ) {
+            onScrollbarMoved( value );
+        }
+    } );
 }
 
 auto LargeFileViewer::eventFilter( QObject* obj, QEvent* event ) -> bool
@@ -92,7 +110,19 @@ auto LargeFileViewer::onScrollbarMoved( int value ) -> void
     if( vBar->maximum() > 0 ) {
         double percent = ( static_cast<double>( value ) / vBar->maximum() ) * 100.0;
         QString tip = QString( "Line: %1\n%2%" ).arg( value + 1 ).arg( percent, 0, 'f', 1 );
-        QToolTip::showText( QCursor::pos(), tip, this );
+
+        if( scrollbar_tooltip_ != nullptr ) {
+            scrollbar_tooltip_->setText( tip );
+            scrollbar_tooltip_->adjustSize();
+
+            double proportion = static_cast<double>( value ) / vBar->maximum();
+            int handleCenterY =
+                static_cast<int>( proportion * ( vBar->height() - scrollbar_tooltip_->height() ) );
+            QPoint pos =
+                vBar->mapToGlobal( QPoint( -scrollbar_tooltip_->width() - 5, handleCenterY ) );
+
+            scrollbar_tooltip_->move( pos );
+        }
     }
 }
 
@@ -149,10 +179,10 @@ auto LargeFileViewer::getLineText( int line ) const -> QString
 
 auto LargeFileViewer::getLineTextCached( int line ) -> QString
 {
-    for( const auto& cls : line_cache_ ) {
-        if( cls.line_ == line ) {
-            return cls.text_;
-        }
+    auto it = std::find_if( line_cache_.begin(), line_cache_.end(),
+                            [line]( const auto& cls ) { return cls.line_ == line; } );
+    if( it != line_cache_.end() ) {
+        return it->text_;
     }
     QString text = getLineText( line );
     line_cache_.push_back( { line, text } );
@@ -178,6 +208,7 @@ auto LargeFileViewer::setCursorPosition( int line, int col ) -> void
     cursor_visible_ = true;
     scrollToCursor();
     viewport()->update();
+    emit cursorPositionChanged( cursor_line_, cursor_col_ );
 }
 
 auto LargeFileViewer::scrollToCursor() -> void
@@ -271,6 +302,8 @@ auto LargeFileViewer::keyPressEvent( QKeyEvent* event ) -> void
     refreshLineOffsets();
     viewport()->update();
 
+    emit cursorPositionChanged( cursor_line_, cursor_col_ );
+
     line_offset_timer_->start( kLineOffsetDelayMs );
 }
 // NOLINTEND
@@ -308,6 +341,8 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
 
     cursor_visible_ = true;
     viewport()->update();
+
+    emit cursorPositionChanged( cursor_line_, cursor_col_ );
 }
 
 auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void

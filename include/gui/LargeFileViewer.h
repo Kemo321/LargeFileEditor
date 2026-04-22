@@ -8,6 +8,7 @@
 
 #include <QAbstractScrollArea>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -71,11 +72,45 @@ public:
      */
     auto refreshView() -> void;
 
+signals:
+    /**
+     * @brief Emitted when the internal cursor position changes.
+     * @param line The new 0-indexed line number.
+     * @param col The new 0-indexed column number.
+     */
+    void cursorPositionChanged( int line, int col );
+
 protected:
+    /**
+     * @brief Filters events for the viewport to handle custom painting.
+     * @param obj Object receiving the event.
+     * @param event The event being received.
+     * @return True if the event was handled, false otherwise.
+     */
     auto eventFilter( QObject* obj, QEvent* event ) -> bool override;
+
+    /**
+     * @brief Handles widget resize events to recalculate visible lines.
+     * @param event The resize event.
+     */
     auto resizeEvent( QResizeEvent* event ) -> void override;
+
+    /**
+     * @brief Handles mouse wheel events for scrolling.
+     * @param event The wheel event.
+     */
     auto wheelEvent( QWheelEvent* event ) -> void override;
+
+    /**
+     * @brief Handles key presses for cursor movement and text editing.
+     * @param event The key event.
+     */
     auto keyPressEvent( QKeyEvent* event ) -> void override;
+
+    /**
+     * @brief Handles mouse presses for cursor positioning.
+     * @param event The mouse event.
+     */
     auto mousePressEvent( QMouseEvent* event ) -> void override;
 
 private:
@@ -93,6 +128,8 @@ private:
     PieceTable* piece_table_{ nullptr };
     QStringList mock_highlight_words_;
     std::vector<uint64_t> line_offsets_;
+
+    QLabel* scrollbar_tooltip_{ nullptr };
 
     struct CachedLine {
         int line_;

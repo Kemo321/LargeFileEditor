@@ -45,6 +45,10 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     connect( find_watcher_, &QFutureWatcher<std::vector<uint64_t>>::finished, this,
              &MainWindow::onFindFinished );
 
+    connect( viewer_, &LargeFileViewer::cursorPositionChanged, this, [this]( int line, int col ) {
+        cursor_pos_label_->setText( QString( "Line %1, Col %2" ).arg( line + 1 ).arg( col + 1 ) );
+    } );
+
     setWindowModified( false );
     updateWindowTitle();
     resize( kDefaultWindowWidth, kDefaultWindowHeight );
