@@ -6,7 +6,6 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -19,7 +18,6 @@ public:
         uint64_t start_;
         uint64_t length_;
         uint32_t line_count_;
-        std::shared_ptr<std::vector<uint32_t>> newlines_;
     };
 
     PieceTable();
@@ -51,18 +49,9 @@ public:
 
     auto undo() -> bool;
     auto redo() -> bool;
-    [[nodiscard]] auto canUndo() const -> bool
-    {
-        return !undoStack_.empty();
-    }
-    [[nodiscard]] auto canRedo() const -> bool
-    {
-        return !redoStack_.empty();
-    }
-    [[nodiscard]] auto isDirty() const -> bool
-    {
-        return undoStack_.size() != lastSavedUndoSize_;
-    }
+    [[nodiscard]] auto canUndo() const -> bool { return !undoStack_.empty(); }
+    [[nodiscard]] auto canRedo() const -> bool { return !redoStack_.empty(); }
+    [[nodiscard]] auto isDirty() const -> bool { return undoStack_.size() != lastSavedUndoSize_; }
 
     [[nodiscard]] auto getLineCount() const -> int;
     [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
@@ -93,6 +82,10 @@ private:
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
+    
+    std::vector<uint64_t> originalNewlines_;
+    std::vector<uint64_t> addNewlines_;
+
     bool isBatchOperation_{ false };
     uint64_t lastSavedUndoSize_{ 0 };
 };

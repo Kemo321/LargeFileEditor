@@ -11,7 +11,7 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <cctype>  // Dodano dla std::tolower i std::isalnum
+#include <cctype>
 #include <fstream>
 #include <numeric>
 #include <stdexcept>
@@ -23,14 +23,15 @@ PieceTable::PieceTable( const std::string& filePath )
 {
     openMmap( filePath );
     if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr && mmapSize_ > 0 ) {
-        auto newlines = std::make_shared<std::vector<uint32_t>>();
+        // Preallocate for performance estimate
+        originalNewlines_.reserve(mmapSize_ / 50);
         for( uint64_t i = 0; i < mmapSize_; ++i ) {
             if( originalBuffer_[i] == '\n' ) {
-                newlines->push_back( i );
+                originalNewlines_.push_back( i );
             }
         }
         pieces_.push_back( { BufferType::Original, 0, mmapSize_,
-                             static_cast<uint32_t>( newlines->size() ), newlines } );
+                             static_cast<uint32_t>( originalNewlines_.size() ) } );
     }
 }
 
@@ -48,12 +49,15 @@ auto PieceTable::openMmap( const std::string& filePath ) -> void
 
     struct stat sb {};
     if( fstat( fileDescriptor_, &sb ) == -1 ) {
+        close(fileDescriptor_);
+        fileDescriptor_ = -1;
         return;
     }
 
     mmapSize_ = static_cast<uint64_t>( sb.st_size );
+    // Use MAP_PRIVATE to avoid SIGBUS if the file is modified externally
     originalBuffer_ = static_cast<const char*>(
-        mmap( nullptr, mmapSize_, PROT_READ, MAP_SHARED, fileDescriptor_, 0 ) );
+        mmap( nullptr, mmapSize_, PROT_READ, MAP_PRIVATE, fileDescriptor_, 0 ) );
 }
 
 auto PieceTable::closeMmap() -> void
@@ -78,7 +82,12 @@ auto PieceTable::size() const -> uint64_t
 auto PieceTable::getText() const -> std::string
 {
     std::string result;
-    result.reserve( size() );
+    try {
+        result.reserve( std::min<uint64_t>(size(), 512 * 1024 * 1024) ); // Cap preallocation to 512MB
+    } catch (const std::bad_alloc&) {
+        // Fallback if system cannot provide contiguous memory
+    }
+
     for( const auto& piece : pieces_ ) {
         if( piece.type_ == BufferType::Original ) {
             if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr ) {
@@ -137,24 +146,17 @@ auto PieceTable::splitPiece( size_t pieceIndex, uint64_t offset ) -> void
         return;
     }
 
-    Piece original = pieces_[pieceIndex];
-    pieces_[pieceIndex].length_ = offset;
+    Piece& orig = pieces_[pieceIndex];
+    const auto& newlines = (orig.type_ == BufferType::Original) ? originalNewlines_ : addNewlines_;
 
-    auto it = std::lower_bound( original.newlines_->begin(), original.newlines_->end(), offset );
+    auto it1 = std::lower_bound(newlines.begin(), newlines.end(), orig.start_);
+    auto it2 = std::lower_bound(it1, newlines.end(), orig.start_ + offset);
+    uint32_t left_lines = std::distance(it1, it2);
 
-    auto left_newlines = std::make_shared<std::vector<uint32_t>>( original.newlines_->begin(), it );
-    auto right_newlines = std::make_shared<std::vector<uint32_t>>();
-    right_newlines->reserve( std::distance( it, original.newlines_->end() ) );
+    Piece nextPiece = { orig.type_, orig.start_ + offset, orig.length_ - offset, orig.line_count_ - left_lines };
+    orig.length_ = offset;
+    orig.line_count_ = left_lines;
 
-    for( auto iter = it; iter != original.newlines_->end(); ++iter ) {
-        right_newlines->push_back( *iter - offset );
-    }
-
-    pieces_[pieceIndex].newlines_ = left_newlines;
-    pieces_[pieceIndex].line_count_ = left_newlines->size();
-
-    Piece nextPiece = { original.type_, original.start_ + offset, original.length_ - offset,
-                        static_cast<uint32_t>( right_newlines->size() ), right_newlines };
     pieces_.insert( pieces_.begin() + pieceIndex + 1, nextPiece );
 }
 
@@ -174,16 +176,16 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
     addBuffer_.append( text );
     const auto textLength = static_cast<uint64_t>( text.length() );
 
-    auto newlines = std::make_shared<std::vector<uint32_t>>();
+    uint32_t line_count = 0;
     for( uint32_t i = 0; i < textLength; ++i ) {
         if( text[i] == '\n' ) {
-            newlines->push_back( i );
+            addNewlines_.push_back( startInAdd + i );
+            line_count++;
         }
     }
 
     if( position == currentSize ) {
-        pieces_.push_back( { BufferType::Add, startInAdd, textLength,
-                             static_cast<uint32_t>( newlines->size() ), newlines } );
+        pieces_.push_back( { BufferType::Add, startInAdd, textLength, line_count } );
     } else {
         auto res = findPieceAt( position );
         if( res.offsetInPiece_ > 0 ) {
@@ -191,8 +193,7 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
             res.pieceIndex_++;
         }
         pieces_.insert( pieces_.begin() + res.pieceIndex_,
-                        { BufferType::Add, startInAdd, textLength,
-                          static_cast<uint32_t>( newlines->size() ), newlines } );
+                        { BufferType::Add, startInAdd, textLength, line_count } );
     }
 }
 
@@ -382,6 +383,7 @@ void PieceTable::saveState()
     }
     undoStack_.push_back( pieces_ );
     redoStack_.clear();
+    // 100 history states is safe because pieces_ copying is now very cheap
     if( undoStack_.size() > 100 ) {
         undoStack_.erase( undoStack_.begin() );
     }
@@ -415,6 +417,8 @@ PieceTable::PieceTable( PieceTable&& other ) noexcept
       fileDescriptor_( other.fileDescriptor_ ),
       addBuffer_( std::move( other.addBuffer_ ) ),
       pieces_( std::move( other.pieces_ ) ),
+      originalNewlines_( std::move( other.originalNewlines_ ) ),
+      addNewlines_( std::move( other.addNewlines_ ) ),
       isBatchOperation_( other.isBatchOperation_ ),
       lastSavedUndoSize_( other.lastSavedUndoSize_ ),
       undoStack_( std::move( other.undoStack_ ) ),
@@ -434,6 +438,8 @@ auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
         fileDescriptor_ = other.fileDescriptor_;
         addBuffer_ = std::move( other.addBuffer_ );
         pieces_ = std::move( other.pieces_ );
+        originalNewlines_ = std::move( other.originalNewlines_ );
+        addNewlines_ = std::move( other.addNewlines_ );
         isBatchOperation_ = other.isBatchOperation_;
         lastSavedUndoSize_ = other.lastSavedUndoSize_;
         undoStack_ = std::move( other.undoStack_ );
@@ -464,7 +470,12 @@ auto PieceTable::getLineStart( int line ) const -> uint64_t
     for( const auto& piece : pieces_ ) {
         if( current_line + piece.line_count_ >= static_cast<uint32_t>( line ) ) {
             int newline_index = line - current_line - 1;
-            return current_pos + piece.newlines_->at( newline_index ) + 1;
+            const auto& newlines = (piece.type_ == BufferType::Original) ? originalNewlines_ : addNewlines_;
+            auto it = std::lower_bound(newlines.begin(), newlines.end(), piece.start_);
+            
+            uint64_t absolute_pos = *(it + newline_index);
+            uint64_t offset_in_piece = absolute_pos - piece.start_;
+            return current_pos + offset_in_piece + 1;
         }
         current_line += piece.line_count_;
         current_pos += piece.length_;
@@ -483,11 +494,12 @@ auto PieceTable::getLineFromPosition( uint64_t position ) const -> int
 
     for( const auto& piece : pieces_ ) {
         if( position < current_pos + piece.length_ ) {
-            uint32_t offset_in_piece = position - current_pos;
-            auto it = std::upper_bound( piece.newlines_->begin(), piece.newlines_->end(),
-                                        offset_in_piece );
-            int newlines_before = std::distance( piece.newlines_->begin(), it );
-            return current_line + newlines_before;
+            uint64_t offset_in_piece = position - current_pos;
+            const auto& newlines = (piece.type_ == BufferType::Original) ? originalNewlines_ : addNewlines_;
+            
+            auto it1 = std::lower_bound(newlines.begin(), newlines.end(), piece.start_);
+            auto it2 = std::upper_bound(it1, newlines.end(), piece.start_ + offset_in_piece);
+            return current_line + std::distance(it1, it2);
         }
         current_line += piece.line_count_;
         current_pos += piece.length_;
@@ -512,7 +524,7 @@ auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
         uint64_t availableInPiece = piece.length_ - offset;
         uint64_t toTake = std::min( remaining, availableInPiece );
 
-        fragments.push_back( { piece.type_, piece.start_ + offset, toTake, 0, nullptr } );
+        fragments.push_back( { piece.type_, piece.start_ + offset, toTake, 0 } ); // line_count omitted for fragments
 
         remaining -= toTake;
         offset = 0;

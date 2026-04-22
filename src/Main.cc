@@ -7,8 +7,6 @@
 
 #include "gui/MainWindow.h"
 
-using namespace std;
-
 auto main( int argc, char* argv[] ) -> int
 {
     QApplication app( argc, argv );

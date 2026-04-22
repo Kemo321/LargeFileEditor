@@ -45,8 +45,14 @@ void LargeFileViewer::resizeEvent( QResizeEvent* event )
     refreshLineOffsets();
 }
 
+void LargeFileViewer::invalidateCache()
+{
+    line_cache_.clear();
+}
+
 void LargeFileViewer::refreshView()
 {
+    invalidateCache();
     refreshLineOffsets();
     viewport()->update();
 }
@@ -104,6 +110,7 @@ void LargeFileViewer::setPieceTable( PieceTable* pieceTable )
     piece_table_ = pieceTable;
     cursor_line_ = 0;
     cursor_col_ = 0;
+    invalidateCache();
     refreshLineOffsets();
     verticalScrollBar()->setValue( 0 );
     viewport()->update();
@@ -133,6 +140,18 @@ auto LargeFileViewer::getLineText( int line ) const -> QString
     return qline;
 }
 
+auto LargeFileViewer::getLineTextCached( int line ) -> QString
+{
+    for( const auto& cl : line_cache_ ) {
+        if( cl.line == line ) {
+            return cl.text;
+        }
+    }
+    QString text = getLineText( line );
+    line_cache_.push_back( { line, text } );
+    return text;
+}
+
 auto LargeFileViewer::getLogicalPosition( int line, int col ) const -> uint64_t
 {
     if( piece_table_ == nullptr ) {
@@ -147,7 +166,7 @@ void LargeFileViewer::setCursorPosition( int line, int col )
         return;
     }
     cursor_line_ = std::max( 0, std::min( line, piece_table_->getLineCount() - 1 ) );
-    int lineLen = getLineText( cursor_line_ ).length();
+    int lineLen = getLineTextCached( cursor_line_ ).length();
     cursor_col_ = std::max( 0, std::min( col, lineLen ) );
     cursor_visible_ = true;
     scrollToCursor();
@@ -176,16 +195,17 @@ void LargeFileViewer::keyPressEvent( QKeyEvent* event )
 
     QString text = event->text();
     int key = event->key();
+    bool tableModified = false;
 
     if( key == Qt::Key_Left ) {
         if( cursor_col_ > 0 ) {
             cursor_col_--;
         } else if( cursor_line_ > 0 ) {
             cursor_line_--;
-            cursor_col_ = getLineText( cursor_line_ ).length();
+            cursor_col_ = getLineTextCached( cursor_line_ ).length();
         }
     } else if( key == Qt::Key_Right ) {
-        if( cursor_col_ < getLineText( cursor_line_ ).length() ) {
+        if( cursor_col_ < getLineTextCached( cursor_line_ ).length() ) {
             cursor_col_++;
         } else if( cursor_line_ < piece_table_->getLineCount() - 1 ) {
             cursor_line_++;
@@ -195,39 +215,47 @@ void LargeFileViewer::keyPressEvent( QKeyEvent* event )
         if( cursor_line_ > 0 ) {
             cursor_line_--;
             cursor_col_ =
-                std::min( cursor_col_, static_cast<int>( getLineText( cursor_line_ ).length() ) );
+                std::min( cursor_col_, static_cast<int>( getLineTextCached( cursor_line_ ).length() ) );
         }
     } else if( key == Qt::Key_Down ) {
         if( cursor_line_ < piece_table_->getLineCount() - 1 ) {
             cursor_line_++;
             cursor_col_ =
-                std::min( cursor_col_, static_cast<int>( getLineText( cursor_line_ ).length() ) );
+                std::min( cursor_col_, static_cast<int>( getLineTextCached( cursor_line_ ).length() ) );
         }
     } else if( key == Qt::Key_Backspace ) {
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         if( pos > 0 ) {
             piece_table_->remove( pos - 1, 1 );
+            tableModified = true;
             if( cursor_col_ > 0 ) {
                 cursor_col_--;
             } else {
                 cursor_line_--;
-                cursor_col_ = getLineText( cursor_line_ ).length();
+                cursor_col_ = getLineTextCached( cursor_line_ ).length();
             }
         }
     } else if( key == Qt::Key_Delete ) {
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         if( pos < piece_table_->size() ) {
             piece_table_->remove( pos, 1 );
+            tableModified = true;
         }
     } else if( key == Qt::Key_Return || key == Qt::Key_Enter ) {
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         piece_table_->insert( pos, "\n" );
+        tableModified = true;
         cursor_line_++;
         cursor_col_ = 0;
     } else if( !text.isEmpty() && text.at( 0 ).isPrint() ) {
         uint64_t pos = getLogicalPosition( cursor_line_, cursor_col_ );
         piece_table_->insert( pos, text.toStdString() );
+        tableModified = true;
         cursor_col_ += text.length();
+    }
+
+    if (tableModified) {
+        invalidateCache();
     }
 
     cursor_visible_ = true;
@@ -252,7 +280,7 @@ void LargeFileViewer::mousePressEvent( QMouseEvent* event )
 
     if( targetLine < piece_table_->getLineCount() ) {
         cursor_line_ = targetLine;
-        QString lineText = getLineText( cursor_line_ );
+        QString lineText = getLineTextCached( cursor_line_ );
 
         int textX = event->position().x() - gutter_width_ - 10;
         int col = 0;
@@ -298,7 +326,7 @@ void LargeFileViewer::paintViewport( QPaintEvent* event )
             break;
         }
 
-        QString lineText = getLineText( currentLineIndex );
+        QString lineText = getLineTextCached( currentLineIndex );
         int yBase = i * lineHeight;
         int yText = yBase + fm.ascent() + 2;
 

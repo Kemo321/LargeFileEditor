@@ -7,7 +7,6 @@
 #include <QMenu>
 #include <QProgressBar>
 #include <QString>
-#include <QFutureWatcher>
 #include <memory>
 #include <vector>
 
@@ -72,6 +71,4 @@ private:
     std::vector<uint64_t> current_find_results_;
     QString current_find_text_;
     int current_find_index_{ -1 };
-
-    QFutureWatcher<std::vector<uint64_t>>* find_watcher_{ nullptr }; 
 };

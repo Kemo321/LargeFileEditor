@@ -43,11 +43,19 @@ private:
     void paintViewport( QPaintEvent* event );
     [[nodiscard]] auto getLogicalPosition( int line, int col ) const -> uint64_t;
     [[nodiscard]] auto getLineText( int line ) const -> QString;
+    [[nodiscard]] auto getLineTextCached( int line ) -> QString;
     void refreshLineOffsets();
+    void invalidateCache();
 
     PieceTable* piece_table_{ nullptr };
     QStringList mock_highlight_words_;
     std::vector<uint64_t> line_offsets_;
+
+    struct CachedLine {
+        int line;
+        QString text;
+    };
+    std::vector<CachedLine> line_cache_;
 
     int cursor_line_{ 0 };
     int cursor_col_{ 0 };

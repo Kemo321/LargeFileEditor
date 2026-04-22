@@ -72,7 +72,6 @@ void FindReplaceDialog::setupUi()
 
     findLayout->addLayout( findButtonLayout );
 
-    // --- Replace Tab ---
     auto* replaceTab = new QWidget( tab_widget_ );
     auto* replaceLayout = new QVBoxLayout( replaceTab );
 
