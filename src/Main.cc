@@ -1,13 +1,12 @@
 /**
- * Author: Tomasz Okon
- * Description: Application entry point.
+ * @file Main.cc
+ * @author Tomasz Okon
+ * @brief Application entry point.
  */
 
 #include <QApplication>
 
 #include "gui/MainWindow.h"
-
-using namespace std;
 
 auto main( int argc, char* argv[] ) -> int
 {

@@ -1,6 +1,7 @@
 /**
- * Authors: Tomasz Okon
- * Description: Header of the logic layer (backend) - Piece Table implementation.
+ * @file PieceTable.h
+ * @author Tomasz Okon
+ * @brief Logic layer header for the Piece Table implementation.
  */
 
 #pragma once
@@ -10,122 +11,147 @@
 #include <vector>
 
 /**
- * @brief A data structure for zero-copy, efficient editing of large texts.
+ * @class PieceTable
+ * @brief Efficient data structure for text editing in very large files.
  */
 class PieceTable {
 public:
     /**
-     * @brief Identifies which buffer a piece refers to.
+     * @enum BufferType
+     * @brief Identifies the buffer origin for a specific text piece.
      */
-    enum class BufferType { Original, Add };
+    enum class BufferType : std::uint8_t { Original, Add };
 
     /**
-     * @brief Represents a fragment of the document.
+     * @struct Piece
+     * @brief Represents a continuous segment of text in one of the buffers.
      */
     struct Piece {
         BufferType type_;
         uint64_t start_;
         uint64_t length_;
+        uint32_t line_count_;
     };
 
     /**
-     * @brief Default constructor creating an empty document.
+     * @brief Default constructor for an empty PieceTable.
      */
     PieceTable();
 
     /**
-     * @brief Constructor initializing the table by mapping a file from disk.
-     * @param filePath Path to the file to be memory-mapped.
+     * @brief Constructs a PieceTable by memory-mapping a file.
+     * @param filePath Path to the file.
      */
     explicit PieceTable( const std::string& filePath );
 
     /**
-     * @brief Destructor ensuring proper unmapping of the file and closing descriptors.
+     * @brief Destructor that closes memory maps.
      */
     ~PieceTable();
 
-    // Disable copy semantics to prevent double unmapping of the same file descriptor
     PieceTable( const PieceTable& ) = delete;
     auto operator=( const PieceTable& ) -> PieceTable& = delete;
 
-    // Custom move semantics to prevent double unmapping of the same file descriptor
     PieceTable( PieceTable&& other ) noexcept;
     auto operator=( PieceTable&& other ) noexcept -> PieceTable&;
 
     /**
-     * @brief Replaces the first occurrence of a pattern with new text.
+     * @brief Replaces the first occurrence of a pattern.
+     * @param pattern The string to search for.
+     * @param replacement The string to substitute.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @return True if a replacement was made.
      */
-    auto replaceFirst( const std::string& pattern, const std::string& replacement ) -> bool;
+    auto replaceFirst( const std::string& pattern, const std::string& replacement,
+                       bool matchCase = true, bool matchWord = false ) -> bool;
 
     /**
-     * @brief Replaces all occurrences of a pattern with new text.
+     * @brief Replaces all occurrences of a pattern.
+     * @param pattern The string to search for.
+     * @param replacement The string to substitute.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
      * @return Number of replacements made.
      */
-    auto replaceAll( const std::string& pattern, const std::string& replacement ) -> uint64_t;
+    auto replaceAll( const std::string& pattern, const std::string& replacement,
+                     bool matchCase = true, bool matchWord = false ) -> uint64_t;
 
     /**
-     * @brief Returns the total document size in characters.
+     * @brief Retrieves the total logical size of the text.
+     * @return Size in bytes.
      */
     [[nodiscard]] auto size() const -> uint64_t;
 
     /**
-     * @brief Retrieves the entire current document content.
+     * @brief Reconstructs the entire text into a string.
+     * @return The complete document text.
      */
     [[nodiscard]] auto getText() const -> std::string;
 
     /**
-     * @brief Searches for all occurrences of a pattern using the KMP algorithm.
+     * @brief Finds all logical positions of a substring.
      * @param pattern The string to search for.
-     * @return Vector of logical positions where the pattern starts.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @return Vector of starting byte positions.
      */
-    [[nodiscard]] auto findAll( const std::string& pattern ) const -> std::vector<uint64_t>;
+    [[nodiscard]] auto findAll( const std::string& pattern, bool matchCase = true,
+                                bool matchWord = false ) const -> std::vector<uint64_t>;
 
     /**
-     * @brief Retrieves a fragment of the document without copying the entire file.
-     * @param position Starting logical position.
-     * @param length Number of characters to retrieve.
-     * @return A string containing only the requested part.
+     * @brief Retrieves a specific substring.
+     * @param position Starting logical byte position.
+     * @param length Number of bytes to retrieve.
+     * @return The requested substring.
      */
     [[nodiscard]] auto getSubstr( uint64_t position, uint64_t length ) const -> std::string;
 
     /**
-     * @brief For a given logical range, returns which parts come from Original and which from Add
-     * buffer. Useful for syntax highlighting or specialized rendering in the GUI.
+     * @brief Retrieves fragment metadata for a specific range.
+     * @param position Starting logical byte position.
+     * @param length Length of the range.
+     * @return Vector of intersecting pieces.
      */
     [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const
         -> std::vector<Piece>;
 
     /**
-     * @brief Inserts new text at the given position.
+     * @brief Inserts text at the specified logical position.
+     * @param position Byte position to insert at.
+     * @param text String to insert.
      */
     auto insert( uint64_t position, const std::string& text ) -> void;
 
     /**
-     * @brief Removes a fragment of text from the document.
+     * @brief Removes text from the specified logical position.
+     * @param position Starting byte position.
+     * @param length Number of bytes to remove.
      */
     auto remove( uint64_t position, uint64_t length ) -> void;
 
     /**
-     * @brief Saves the current document state to a file.
-     * @param filePath Path where the file should be saved.
-     * @return True if successful.
+     * @brief Saves the active document state to a file.
+     * @param filePath Destination file path.
+     * @return True if save was successful.
      */
     [[nodiscard]] auto saveToFile( const std::string& filePath ) const -> bool;
 
     /**
-     * @brief Reverts the last modification by restoring the previous piece configuration.
-     * @return true if the undo operation was successful, false if the history is empty.
+     * @brief Reverts the last text modification.
+     * @return True if undo was successful.
      */
     auto undo() -> bool;
 
     /**
-     * @brief Re-applies a previously undone modification.
-     * @return true if the redo operation was successful, false if there are no states to redo.
+     * @brief Reapplies the last reverted text modification.
+     * @return True if redo was successful.
      */
     auto redo() -> bool;
 
     /**
-     * @brief Checks if there are any actions available to undo.
+     * @brief Checks if an undo operation is available.
+     * @return True if undo stack is not empty.
      */
     [[nodiscard]] auto canUndo() const -> bool
     {
@@ -133,7 +159,8 @@ public:
     }
 
     /**
-     * @brief Checks if there are any actions available to redo.
+     * @brief Checks if a redo operation is available.
+     * @return True if redo stack is not empty.
      */
     [[nodiscard]] auto canRedo() const -> bool
     {
@@ -141,7 +168,8 @@ public:
     }
 
     /**
-     * @brief Checks if the document has been modified since the last save.
+     * @brief Checks if the document has unsaved modifications.
+     * @return True if state differs from last save.
      */
     [[nodiscard]] auto isDirty() const -> bool
     {
@@ -149,34 +177,33 @@ public:
     }
 
     /**
-     * @brief Returns a list of logical positions of all line breaks.
-     * Useful for mapping vertical scrollbar to line numbers.
+     * @brief Calculates the total number of lines in the document.
+     * @return Line count.
      */
-    [[nodiscard]] auto getLineOffsets() const -> std::vector<uint64_t>;
+    [[nodiscard]] auto getLineCount() const -> int;
+
+    /**
+     * @brief Finds the starting byte position of a given line.
+     * @param line Zero-based line index.
+     * @return Logical byte position.
+     */
+    [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
+
+    /**
+     * @brief Determines the line number for a specific byte position.
+     * @param position Logical byte position.
+     * @return Zero-based line index.
+     */
+    [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
 
 private:
-    /**
-     * @brief Computes the Longest Prefix Suffix (LPS) array for the KMP algorithm.
-     */
     [[nodiscard]] static auto computeLPS( const std::string& pattern ) -> std::vector<int>;
 
-    /** * @brief Stacks for storing the state of the piece vector.
-     * We store only the vector of Pieces (pointers), which makes snapshots
-     * extremely memory-efficient even for massive files.
-     */
     std::vector<std::vector<Piece>> undoStack_;
     std::vector<std::vector<Piece>> redoStack_;
 
-    /**
-     * @brief Saves the current configuration of pieces to the undo stack.
-     * This method is called before any modifying operation (insert, remove, replace).
-     * It also clears the redo stack to maintain linear history consistency.
-     */
     auto saveState() -> void;
 
-    /**
-     * @brief Result of finding a piece at a specific logical position.
-     */
     struct FindResult {
         size_t pieceIndex_;
         uint64_t offsetInPiece_;
@@ -194,6 +221,10 @@ private:
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
+
+    std::vector<uint64_t> originalNewlines_;
+    std::vector<uint64_t> addNewlines_;
+
     bool isBatchOperation_{ false };
     uint64_t lastSavedUndoSize_{ 0 };
 };
