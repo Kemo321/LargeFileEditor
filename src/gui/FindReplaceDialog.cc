@@ -1,8 +1,3 @@
-/**
- * Authors: Jan Szwagierczak
- * Description: Implementation of the non-modal Find and Replace dialog.
- */
-
 #include "gui/FindReplaceDialog.h"
 
 #include <QHBoxLayout>
@@ -18,15 +13,10 @@ FindReplaceDialog::FindReplaceDialog( QWidget* parent ) : QDialog( parent )
 
     setupUi();
 
-    // Sync "Find what" inputs between tabs
     connect( find_input_1_, &QLineEdit::textEdited, find_input_2_, &QLineEdit::setText );
     connect( find_input_2_, &QLineEdit::textEdited, find_input_1_, &QLineEdit::setText );
-
-    // Sync match case checkboxes
     connect( match_case_1_, &QCheckBox::toggled, match_case_2_, &QCheckBox::setChecked );
     connect( match_case_2_, &QCheckBox::toggled, match_case_1_, &QCheckBox::setChecked );
-
-    // Sync match word checkboxes
     connect( match_word_1_, &QCheckBox::toggled, match_word_2_, &QCheckBox::setChecked );
     connect( match_word_2_, &QCheckBox::toggled, match_word_1_, &QCheckBox::setChecked );
 }
@@ -70,12 +60,16 @@ void FindReplaceDialog::setupUi()
     auto* findButtonLayout = new QHBoxLayout();
     findButtonLayout->addStretch();
     auto* btnFindNext1 = new QPushButton( "Find Next" );
-    auto* btnFindPrev1 = new QPushButton( "Find Previous" );
     auto* btnClose1 = new QPushButton( "Close" );
     findButtonLayout->addWidget( btnFindNext1 );
-    findButtonLayout->addWidget( btnFindPrev1 );
     findButtonLayout->addWidget( btnClose1 );
     connect( btnClose1, &QPushButton::clicked, this, &QDialog::hide );
+
+    connect( btnFindNext1, &QPushButton::clicked, this, [this]() {
+        emit findNextRequested( find_input_1_->text(), match_case_1_->isChecked(),
+                                match_word_1_->isChecked() );
+    } );
+
     findLayout->addLayout( findButtonLayout );
 
     // --- Replace Tab ---
@@ -109,12 +103,26 @@ void FindReplaceDialog::setupUi()
     replaceButtonLayout->addWidget( btnReplace );
     replaceButtonLayout->addWidget( btnReplaceAll );
     replaceButtonLayout->addWidget( btnClose2 );
+
     connect( btnClose2, &QPushButton::clicked, this, &QDialog::hide );
+
+    connect( btnFindNext2, &QPushButton::clicked, this, [this]() {
+        emit findNextRequested( find_input_2_->text(), match_case_2_->isChecked(),
+                                match_word_2_->isChecked() );
+    } );
+    connect( btnReplace, &QPushButton::clicked, this, [this]() {
+        emit replaceNextRequested( find_input_2_->text(), replace_input_->text(),
+                                   match_case_2_->isChecked(), match_word_2_->isChecked() );
+    } );
+    connect( btnReplaceAll, &QPushButton::clicked, this, [this]() {
+        emit replaceAllRequested( find_input_2_->text(), replace_input_->text(),
+                                  match_case_2_->isChecked(), match_word_2_->isChecked() );
+    } );
+
     replaceLayout->addLayout( replaceButtonLayout );
 
     tab_widget_->addTab( findTab, "Find" );
     tab_widget_->addTab( replaceTab, "Replace" );
-
     mainLayout->addWidget( tab_widget_ );
     setLayout( mainLayout );
 }

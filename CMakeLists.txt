@@ -16,7 +16,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Concurrent)
 
 include_directories(include)
 
@@ -33,7 +33,8 @@ set(SOURCES
 include_directories(include)
 
 add_executable(LargeFileEditor ${SOURCES})
-target_link_libraries(LargeFileEditor PRIVATE Qt6::Core Qt6::Widgets)
+target_link_libraries(LargeFileEditor PRIVATE Qt6::Core Qt6::Widgets
+                                              Qt6::Concurrent)
 
 set(INSTALL_GTEST
     OFF

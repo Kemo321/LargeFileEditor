@@ -1,22 +1,19 @@
-/**
- * Authors: Jan Szwagierczak
- * Description: Header of the custom widget for displaying large file content.
- */
-
 #pragma once
 
 #include <QAbstractScrollArea>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QRect>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QStringList>
+#include <QTimer>
+#include <vector>
 
-/**
- * @brief A custom minimalistic text rendering area designed to avoid
- * loading the entire file into RAM.
- */
+#include "backend/PieceTable.h"
+
 class LargeFileViewer : public QAbstractScrollArea {
     Q_OBJECT
 
@@ -24,19 +21,38 @@ public:
     explicit LargeFileViewer( QWidget* parent = nullptr );
     ~LargeFileViewer() override = default;
 
-    /**
-     * @brief Mock method demonstrating how search result highlights will be visually applied.
-     */
     void setMockHighlights( const QStringList& words );
+    void setPieceTable( PieceTable* pieceTable );
+    void setCursorPosition( int line, int col );
+    void scrollToCursor();
+    void jumpToLogicalPosition( uint64_t pos );
+    void refreshView();
 
 protected:
-    /**
-     * @brief Custom paint event to render the visible portion of the file and highlights.
-     */
-    void paintEvent( QPaintEvent* event ) override;
+    auto eventFilter( QObject* obj, QEvent* event ) -> bool override;
+    void resizeEvent( QResizeEvent* event ) override;
+    void wheelEvent( QWheelEvent* event ) override;
+    void keyPressEvent( QKeyEvent* event ) override;
+    void mousePressEvent( QMouseEvent* event ) override;
 
-private:
+private slots:
+    void blinkCursor();
     void onScrollbarMoved( int value );
 
+private:
+    void paintViewport( QPaintEvent* event );
+    [[nodiscard]] auto getLogicalPosition( int line, int col ) const -> uint64_t;
+    [[nodiscard]] auto getLineText( int line ) const -> QString;
+    void refreshLineOffsets();
+
+    PieceTable* piece_table_{ nullptr };
     QStringList mock_highlight_words_;
+    std::vector<uint64_t> line_offsets_;
+
+    int cursor_line_{ 0 };
+    int cursor_col_{ 0 };
+    bool cursor_visible_{ true };
+    QTimer* cursor_timer_{ nullptr };
+    QTimer* line_offset_timer_{ nullptr };
+    int gutter_width_{ 50 };
 };

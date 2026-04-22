@@ -1,10 +1,4 @@
-/**
- * Authors: Jan Szwagierczak
- * Description: Header of the application's main window (Qt).
- */
-
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
 
 #include <QAction>
 #include <QActionGroup>
@@ -13,32 +7,37 @@
 #include <QMenu>
 #include <QProgressBar>
 #include <QString>
+#include <QFutureWatcher>
+#include <memory>
+#include <vector>
 
 #include "gui/FindReplaceDialog.h"
 #include "gui/LargeFileViewer.h"
+#include "backend/PieceTable.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    /**
-     * @brief Constructs the application's main window.
-     * @param parent The parent widget.
-     */
     explicit MainWindow( QWidget* parent = nullptr );
     ~MainWindow() override = default;
 
-private:
+private slots:
     void openFile();
     void saveFile();
     void saveFileAs();
     void findText();
     void replaceText();
 
-    static void setFontSizeSmall();
-    static void setFontSizeMedium();
-    static void setFontSizeLarge();
+    void onFindNextRequested( const QString& text, bool matchCase, bool matchWord );
+    void onReplaceNextRequested( const QString& findText, const QString& replaceText, bool matchCase, bool matchWord );
+    void onReplaceAllRequested( const QString& findText, const QString& replaceText, bool matchCase, bool matchWord );
 
+    void setFontSizeSmall();
+    void setFontSizeMedium();
+    void setFontSizeLarge();
+
+private:
     void createActions();
     void createMenus();
     void createStatusBar();
@@ -46,33 +45,33 @@ private:
 
     LargeFileViewer* viewer_;
     FindReplaceDialog* find_replace_dialog_{};
+    std::unique_ptr<PieceTable> piece_table_;
 
-    // Status bar widgets
     QLabel* cursor_pos_label_{};
     QProgressBar* task_progress_bar_{};
     QLabel* task_status_label_{};
 
-    // File Actions
     QAction* open_act_{};
     QAction* save_act_{};
     QAction* save_as_act_{};
     QAction* exit_act_{};
 
-    // Edit Actions
     QAction* copy_act_{};
     QAction* cut_act_{};
     QAction* paste_act_{};
     QAction* find_act_{};
     QAction* replace_act_{};
 
-    // View Actions
     QAction* font_small_act_{};
     QAction* font_medium_act_{};
     QAction* font_large_act_{};
     QActionGroup* font_size_group_{};
 
-    // Mock State
     QString current_filename_;
-};
 
-#endif
+    std::vector<uint64_t> current_find_results_;
+    QString current_find_text_;
+    int current_find_index_{ -1 };
+
+    QFutureWatcher<std::vector<uint64_t>>* find_watcher_{ nullptr }; 
+};

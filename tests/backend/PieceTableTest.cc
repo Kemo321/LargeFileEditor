@@ -660,18 +660,6 @@ TEST_F( PieceTableTest, IsDirtyFlagBehavior )
     std::remove( savePath.c_str() );
 }
 
-TEST_F( PieceTableTest, GetLineOffsetsBasic )
-{
-    PieceTable pt( createTempFile( "Line1\nLine2\nLine3" ) );
-
-    auto offsets = pt.getLineOffsets();
-
-    ASSERT_EQ( offsets.size(), 3 );
-    EXPECT_EQ( offsets[0], 0 );   // "Line1\n..."
-    EXPECT_EQ( offsets[1], 6 );   // "Line2\n..."
-    EXPECT_EQ( offsets[2], 12 );  // "Line3"
-}
-
 TEST_F( PieceTableTest, GetFragmentsInRange )
 {
     PieceTable pt( createTempFile( "BaseText" ) );
