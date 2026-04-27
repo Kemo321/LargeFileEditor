@@ -1,6 +1,6 @@
 /**
  * @file MainWindow.h
- * @author Tomasz Okon
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Header of the main application window integrating all components.
  */
 

@@ -1,6 +1,6 @@
 /**
  * @file LargeFileViewer.h
- * @author Tomasz Okon
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief GUI widget for viewing and editing immense files without loading them fully into RAM.
  */
 

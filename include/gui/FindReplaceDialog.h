@@ -1,6 +1,6 @@
 /**
  * @file FindReplaceDialog.h
- * @author Tomasz Okon
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief GUI Dialog for managing search and replace operations.
  */
 
