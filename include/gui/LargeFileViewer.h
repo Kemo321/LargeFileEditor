@@ -18,9 +18,11 @@
 #include <QStringList>
 #include <QTimer>
 #include <QWidget>
+#include <memory>
 #include <vector>
 
 #include "backend/PieceTable.h"
+#include "gui/LineManager.h"
 
 /**
  * @class LargeFileViewer
@@ -128,11 +130,11 @@ private:
     [[nodiscard]] auto getLineTextCached( int line ) -> QString;
 
     auto refreshLineOffsets() -> void;
-    auto invalidateCache() -> void;
+    auto invalidateCache( uint64_t offset = 0 ) -> void;
 
     PieceTable* piece_table_{ nullptr };
+    std::unique_ptr<LineManager> line_manager_;
     QStringList mock_highlight_words_;
-    std::vector<uint64_t> line_offsets_;
 
     QLabel* scrollbar_tooltip_{ nullptr };
 

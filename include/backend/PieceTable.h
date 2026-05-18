@@ -30,7 +30,6 @@ public:
         BufferType type_;
         uint64_t start_;
         uint64_t length_;
-        uint32_t line_count_;
     };
 
     /**
@@ -180,21 +179,21 @@ public:
      * @brief Calculates the total number of lines in the document.
      * @return Line count.
      */
-    [[nodiscard]] auto getLineCount() const -> int;
+    // [[nodiscard]] auto getLineCount() const -> int;
 
     /**
      * @brief Finds the starting byte position of a given line.
      * @param line Zero-based line index.
      * @return Logical byte position.
      */
-    [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
+    // [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
 
     /**
      * @brief Determines the line number for a specific byte position.
      * @param position Logical byte position.
      * @return Zero-based line index.
      */
-    [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
+    // [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
 
 private:
     [[nodiscard]] static auto computeLPS( const std::string& pattern ) -> std::vector<int>;
@@ -221,9 +220,6 @@ private:
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
-
-    std::vector<uint64_t> originalNewlines_;
-    std::vector<uint64_t> addNewlines_;
 
     bool isBatchOperation_{ false };
     uint64_t lastSavedUndoSize_{ 0 };
