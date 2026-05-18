@@ -385,9 +385,6 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
     int totalLines = line_manager_->getLineCount();
 
     int scrollX = horizontalScrollBar()->value();
-    int visibleChars = ( viewport()->width() - gutter_width_ - kGutterTextPadding ) /
-                           fontMetrics.averageCharWidth() +
-                       1;
 
     for( int idx = 0; idx < visibleLinesCount; ++idx ) {
         int currentLineIndex = startLine + idx;
@@ -399,7 +396,10 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
         uint64_t lineLen = line_manager_->getVirtualLineLength( currentLineIndex );
 
         int charOffset = std::min( scrollX, static_cast<int>( lineLen ) );
-        int charsToFetch = std::min( visibleChars, static_cast<int>( lineLen - charOffset ) );
+        // We fetch the rest of the visual line (up to MAX_VISUAL_LINE_LENGTH).
+        // This ensures the string reaches the right edge of the window regardless of font width.
+        // QPainter will automatically and efficiently clip what's drawn outside the viewport.
+        int charsToFetch = static_cast<int>( lineLen - charOffset );
 
         QString lineText = QString::fromStdString(
             piece_table_->getSubstr( lineStart + charOffset, charsToFetch ) );
