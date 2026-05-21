@@ -46,6 +46,15 @@ public:
     auto setMockHighlights( const QStringList& words ) -> void;
 
     /**
+     * @brief Sets search results and the currently active index to highlight.
+     * @param searchResults List of logical byte offsets where the search string occurs.
+     * @param activeIndex The index in searchResults that is currently active.
+     * @param searchLength Length of the search string.
+     */
+    auto setSearchHighlights( const std::vector<uint64_t>& searchResults, int activeIndex,
+                              int searchLength ) -> void;
+
+    /**
      * @brief Attaches a backend PieceTable instance to this viewer.
      * @param pieceTable Pointer to initialized piece table.
      */
@@ -135,6 +144,10 @@ private:
     PieceTable* piece_table_{ nullptr };
     std::unique_ptr<LineManager> line_manager_;
     QStringList mock_highlight_words_;
+
+    std::vector<uint64_t> search_results_;
+    int active_search_index_{ -1 };
+    int search_length_{ 0 };
 
     QLabel* scrollbar_tooltip_{ nullptr };
 

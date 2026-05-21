@@ -111,6 +111,15 @@ auto LargeFileViewer::setMockHighlights( const QStringList& words ) -> void
     viewport()->update();
 }
 
+auto LargeFileViewer::setSearchHighlights( const std::vector<uint64_t>& searchResults,
+                                           int activeIndex, int searchLength ) -> void
+{
+    search_results_ = searchResults;
+    active_search_index_ = activeIndex;
+    search_length_ = searchLength;
+    viewport()->update();
+}
+
 auto LargeFileViewer::onScrollbarMoved( int value ) -> void
 {
     QScrollBar* vBar = verticalScrollBar();
@@ -413,6 +422,39 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
                           QString::number( currentLineIndex + 1 ) );
 
         int textX = gutter_width_ + kGutterTextPadding;
+
+        // Search Highlighting
+        if( !search_results_.empty() && search_length_ > 0 ) {
+            auto it = std::lower_bound( search_results_.begin(), search_results_.end(), lineStart );
+            int indexOffset = std::distance( search_results_.begin(), it );
+
+            while( it != search_results_.end() && *it < lineStart + lineLen ) {
+                uint64_t matchPos = *it;
+                int matchCol = static_cast<int>( matchPos - lineStart );
+
+                // Only draw if it's within our fetched window
+                if( matchCol + search_length_ > charOffset &&
+                    matchCol < charOffset + charsToFetch ) {
+                    int visMatchStart = std::max( 0, matchCol - charOffset );
+                    int visMatchEnd =
+                        std::min( charsToFetch, matchCol + search_length_ - charOffset );
+                    int matchLen = visMatchEnd - visMatchStart;
+
+                    if( matchLen > 0 ) {
+                        int startX =
+                            textX + fontMetrics.horizontalAdvance( lineText.left( visMatchStart ) );
+                        int wordWidth = fontMetrics.horizontalAdvance(
+                            lineText.mid( visMatchStart, matchLen ) );
+
+                        bool isActive = ( indexOffset == active_search_index_ );
+                        QColor bgColor = isActive ? QColor( 255, 215, 0 ) : QColor( 255, 255, 200 );
+                        painter.fillRect( startX, yBase + 2, wordWidth, lineHeight - 4, bgColor );
+                    }
+                }
+                ++it;
+                ++indexOffset;
+            }
+        }
 
         if( !mock_highlight_words_.isEmpty() ) {
             for( const QString& word : mock_highlight_words_ ) {

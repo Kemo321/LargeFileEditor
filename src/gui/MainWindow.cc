@@ -64,6 +64,33 @@ MainWindow::~MainWindow()
     }
 }
 
+auto MainWindow::closeEvent( QCloseEvent* event ) -> void
+{
+    if( isWindowModified() ) {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::warning(
+            this, "Unsaved Changes",
+            "The document has been modified. Do you want to save your changes before closing?",
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel );
+        if( reply == QMessageBox::Save ) {
+            saveFile();
+            // Since save is asynchronous, we cannot just accept immediately if we really want to
+            // wait for it. But if it's already a temp file flow, we might need to block. For
+            // simplicity and as per standard Qt flow:
+            if( ( save_watcher_ != nullptr ) && save_watcher_->isRunning() ) {
+                save_watcher_->waitForFinished();
+            }
+            event->accept();
+        } else if( reply == QMessageBox::Cancel ) {
+            event->ignore();
+        } else {
+            event->accept();
+        }
+    } else {
+        event->accept();
+    }
+}
+
 auto MainWindow::createActions() -> void
 {
     open_act_ = new QAction( "&Open...", this );
@@ -243,6 +270,8 @@ auto MainWindow::onSaveFinished() -> void
         if( !QFile::rename( pending_temp_filename_, current_filename_ ) ) {
             QFile::rename( backup_filename, current_filename_ );
             task_status_label_->setText( "Save error: Rename failed" );
+            QMessageBox::critical( this, "Save Error",
+                                   "Could not save the file: Rename failed from temp file." );
             return;
         }
 
@@ -257,7 +286,8 @@ auto MainWindow::onSaveFinished() -> void
         task_status_label_->setText( "File saved successfully" );
     } else {
         task_status_label_->setText( "Critical: Save failed" );
-        QMessageBox::warning( this, "Save", "Failed to save file." );
+        QMessageBox::critical( this, "Save Error",
+                               "Could not save the file: Backend piece table write failed." );
     }
 
     QTimer::singleShot( kStatusClearDelayMs, this, [this]() {
@@ -287,6 +317,8 @@ auto MainWindow::saveFileAs() -> void
             task_status_label_->setText( "File saved as: " + QFileInfo( fileName ).fileName() );
         } else {
             task_status_label_->setText( "Save As failed!" );
+            QMessageBox::critical( this, "Save Error",
+                                   "Could not save the file: Backend write failed." );
         }
     }
 }
@@ -359,7 +391,8 @@ auto MainWindow::processFindResults() -> void
 
     uint64_t targetPos = current_find_results_[current_find_index_];
     viewer_->jumpToLogicalPosition( targetPos );
-    viewer_->setMockHighlights( QStringList{ current_find_text_ } );
+    viewer_->setSearchHighlights( current_find_results_, current_find_index_,
+                                  current_find_text_.length() );
 
     task_status_label_->setText( QString( "Match %1 of %2" )
                                      .arg( current_find_index_ + 1 )

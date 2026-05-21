@@ -37,6 +37,9 @@ public:
     explicit MainWindow( QWidget* parent = nullptr );
     ~MainWindow() override;
 
+protected:
+    auto closeEvent( QCloseEvent* event ) -> void override;
+
 private:
     auto openFile() -> void;
     auto saveFile() -> void;
