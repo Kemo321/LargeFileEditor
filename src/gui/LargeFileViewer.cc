@@ -203,7 +203,17 @@ auto LargeFileViewer::getLineText( int line ) const -> QString
     }
 
     std::string rawLine = piece_table_->getSubstr( startByte, length );
-    QString qline = QString::fromStdString( rawLine );
+
+    QString qline = QString::fromUtf8( rawLine.data(), rawLine.size() );
+
+    for( int i = 0; i < qline.length(); ++i ) {
+        ushort unicode = qline[i].unicode();
+        if( ( unicode < 32 && unicode != '\t' && unicode != '\n' && unicode != '\r' ) ||
+            unicode == 127 ) {
+            qline[i] = QChar( 0xFFFD );  // Unicode replacement character
+        }
+    }
+
     return qline;
 }
 

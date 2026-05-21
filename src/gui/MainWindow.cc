@@ -20,13 +20,11 @@ static constexpr int kFontSizeMedium = 11;
 static constexpr int kFontSizeLarge = 14;
 static constexpr int kStatusClearDelayMs = 2000;
 
-MainWindow::MainWindow( QWidget* parent )
-    : QMainWindow( parent ),
-      current_filename_( "Untitled" ),
-      piece_table_( std::make_unique<PieceTable>() )
+MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filename_( "" )
 {
     viewer_ = new LargeFileViewer( this );
-    viewer_->setPieceTable( piece_table_.get() );
+    viewer_->setPieceTable( nullptr );
+    viewer_->setEnabled( false );
     setCentralWidget( viewer_ );
 
     find_replace_dialog_ = new FindReplaceDialog( this );
@@ -183,10 +181,13 @@ auto MainWindow::createStatusBar() -> void
 
 auto MainWindow::updateWindowTitle() -> void
 {
-    setWindowFilePath( current_filename_ );
-    QString displayName =
-        current_filename_ == "Untitled" ? "Untitled" : QFileInfo( current_filename_ ).fileName();
-    setWindowTitle( QString( "[*]%1 - LargeFileEditor" ).arg( displayName ) );
+    if( current_filename_.isEmpty() ) {
+        setWindowTitle( "LargeFileEditor" );
+    } else {
+        setWindowFilePath( current_filename_ );
+        QString displayName = QFileInfo( current_filename_ ).fileName();
+        setWindowTitle( QString( "[*]%1 - LargeFileEditor" ).arg( displayName ) );
+    }
 }
 
 auto MainWindow::setFontSizeSmall() -> void
@@ -223,6 +224,7 @@ auto MainWindow::openFile() -> void
         try {
             piece_table_ = std::make_unique<PieceTable>( fileName.toStdString() );
             viewer_->setPieceTable( piece_table_.get() );
+            viewer_->setEnabled( true );
             viewer_->setMockHighlights( QStringList{} );
             setWindowModified( false );
             updateWindowTitle();
@@ -239,8 +241,7 @@ auto MainWindow::openFile() -> void
 
 auto MainWindow::saveFile() -> void
 {
-    if( current_filename_ == "Untitled" || current_filename_.isEmpty() ) {
-        saveFileAs();
+    if( current_filename_.isEmpty() ) {
         return;
     }
 
