@@ -185,6 +185,7 @@ auto LargeFileViewer::setPieceTable( PieceTable* pieceTable ) -> void
     invalidateCache();
     refreshLineOffsets();
     verticalScrollBar()->setValue( 0 );
+    horizontalScrollBar()->setValue( 0 );
     viewport()->update();
 }
 
@@ -265,13 +266,17 @@ auto LargeFileViewer::scrollToCursor() -> void
     }
 
     int currentHScroll = horizontalScrollBar()->value();
-    int visibleCharsCount = ( viewport()->width() - gutter_width_ - kGutterTextPadding ) /
-                            fontMetrics.averageCharWidth();
+    int visibleWidth = viewport()->width() - gutter_width_ - kGutterTextPadding;
+    
+    // NOWE: Zamiana indeksu znaku na jego pozycję w pikselach
+    QString lineText = getLineTextCached( cursor_line_ );
+    int cursorPx = fontMetrics.horizontalAdvance( lineText.left( cursor_col_ ) );
+    int margin = fontMetrics.averageCharWidth() * 2; // Margines dla lepszej widoczności kursora
 
-    if( cursor_col_ < currentHScroll ) {
-        horizontalScrollBar()->setValue( cursor_col_ );
-    } else if( cursor_col_ >= currentHScroll + visibleCharsCount ) {
-        horizontalScrollBar()->setValue( cursor_col_ - visibleCharsCount + 1 );
+    if( cursorPx < currentHScroll ) {
+        horizontalScrollBar()->setValue( std::max(0, cursorPx - margin) );
+    } else if( cursorPx > currentHScroll + visibleWidth - margin ) {
+        horizontalScrollBar()->setValue( cursorPx - visibleWidth + margin );
     }
 }
 
@@ -464,8 +469,14 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
             prefixWidth = fontMetrics.horizontalAdvance( prefixStr );
         }
 
-        int visibleChars = visibleWidth / fontMetrics.averageCharWidth();
-        int charsToFetch = visibleChars + 100;
+        int textX_ = gutter_width_ + kGutterTextPadding - scrollXPx + prefixWidth;
+
+        int neededWidthPx = viewport()->width() - textX_;
+        if( neededWidthPx < 0 ) {
+            neededWidthPx = visibleWidth;
+        }
+
+        int charsToFetch = ( neededWidthPx / fontMetrics.averageCharWidth() ) * 4 + 100;
         charsToFetch = std::min( charsToFetch, static_cast<int>( lineLen - charOffset ) );
 
         if( charOffset + charsToFetch < lineLen ) {
