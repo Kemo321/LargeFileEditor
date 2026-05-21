@@ -8,7 +8,8 @@
 FindReplaceDialog::FindReplaceDialog( QWidget* parent ) : QDialog( parent )
 {
     setWindowTitle( "Find and Replace" );
-    setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint );
+    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
+                    Qt::WindowCloseButtonHint | Qt::WindowStaysOnTopHint );
     setModal( false );
 
     setupUi();

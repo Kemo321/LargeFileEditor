@@ -20,9 +20,13 @@ static constexpr int kFontSizeMedium = 11;
 static constexpr int kFontSizeLarge = 14;
 static constexpr int kStatusClearDelayMs = 2000;
 
-MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filename_( "Untitled" )
+MainWindow::MainWindow( QWidget* parent )
+    : QMainWindow( parent ),
+      current_filename_( "Untitled" ),
+      piece_table_( std::make_unique<PieceTable>() )
 {
     viewer_ = new LargeFileViewer( this );
+    viewer_->setPieceTable( piece_table_.get() );
     setCentralWidget( viewer_ );
 
     find_replace_dialog_ = new FindReplaceDialog( this );
@@ -67,11 +71,15 @@ MainWindow::~MainWindow()
 auto MainWindow::closeEvent( QCloseEvent* event ) -> void
 {
     if( isWindowModified() ) {
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::warning(
-            this, "Unsaved Changes",
+        QMessageBox msgBox(
+            QMessageBox::Warning, "Unsaved Changes",
             "The document has been modified. Do you want to save your changes before closing?",
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel );
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this );
+        msgBox.setWindowFlags( msgBox.windowFlags() & ~Qt::WindowCloseButtonHint &
+                               ~Qt::WindowMinimizeButtonHint & ~Qt::WindowMaximizeButtonHint );
+
+        int reply = msgBox.exec();
+
         if( reply == QMessageBox::Save ) {
             saveFile();
             // Since save is asynchronous, we cannot just accept immediately if we really want to
@@ -231,6 +239,11 @@ auto MainWindow::openFile() -> void
 
 auto MainWindow::saveFile() -> void
 {
+    if( current_filename_ == "Untitled" || current_filename_.isEmpty() ) {
+        saveFileAs();
+        return;
+    }
+
     if( !piece_table_ || save_watcher_->isRunning() ) {
         return;
     }
@@ -426,6 +439,12 @@ auto MainWindow::onReplaceNextRequested( const QString& findText, const QString&
     for( size_t idx = current_find_index_ + 1; idx < current_find_results_.size(); ++idx ) {
         current_find_results_[idx] += static_cast<uint64_t>( offsetShift );
     }
+
+    current_find_results_.erase( current_find_results_.begin() + current_find_index_ );
+    current_find_index_--;  // Adjust index because we removed the current item
+
+    viewer_->setSearchHighlights( current_find_results_, current_find_index_ + 1,
+                                  current_find_text_.length() );
 
     onFindNextRequested( findText, matchCase, matchWord );
 }

@@ -48,6 +48,7 @@ LargeFileViewer::LargeFileViewer( QWidget* parent ) : QAbstractScrollArea( paren
              [this]() { scrollbar_tooltip_->hide(); } );
 
     connect( verticalScrollBar(), &QScrollBar::valueChanged, this, [this]( int value ) {
+        refreshLineOffsets();
         viewport()->update();
         if( verticalScrollBar()->isSliderDown() ) {
             onScrollbarMoved( value );
@@ -157,7 +158,13 @@ auto LargeFileViewer::refreshLineOffsets() -> void
     verticalScrollBar()->setPageStep( visibleLines );
     verticalScrollBar()->setRange( 0, std::max( 0, totalLines - visibleLines ) );
 
-    int maxChars = 4096;  // From LineManager MAX_VISUAL_LINE_LENGTH
+    int maxChars = 0;
+    int startLine = verticalScrollBar()->value();
+    for( int i = 0; i <= visibleLines && startLine + i < totalLines; ++i ) {
+        maxChars = std::max(
+            maxChars, static_cast<int>( line_manager_->getVirtualLineLength( startLine + i ) ) );
+    }
+
     int visibleChars = ( viewport()->width() - gutter_width_ - kGutterTextPadding ) /
                        fontMetrics.averageCharWidth();
     horizontalScrollBar()->setSingleStep( 1 );
@@ -245,6 +252,16 @@ auto LargeFileViewer::scrollToCursor() -> void
         verticalScrollBar()->setValue( cursor_line_ );
     } else if( cursor_line_ >= currentScroll + visibleLinesCount ) {
         verticalScrollBar()->setValue( cursor_line_ - visibleLinesCount + 1 );
+    }
+
+    int currentHScroll = horizontalScrollBar()->value();
+    int visibleCharsCount = ( viewport()->width() - gutter_width_ - kGutterTextPadding ) /
+                            fontMetrics.averageCharWidth();
+
+    if( cursor_col_ < currentHScroll ) {
+        horizontalScrollBar()->setValue( cursor_col_ );
+    } else if( cursor_col_ >= currentHScroll + visibleCharsCount ) {
+        horizontalScrollBar()->setValue( cursor_col_ - visibleCharsCount + 1 );
     }
 }
 
