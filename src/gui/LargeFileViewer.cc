@@ -165,11 +165,11 @@ auto LargeFileViewer::refreshLineOffsets() -> void
             maxChars, static_cast<int>( line_manager_->getVirtualLineLength( startLine + i ) ) );
     }
 
-    int visibleChars = ( viewport()->width() - gutter_width_ - kGutterTextPadding ) /
-                       fontMetrics.averageCharWidth();
-    horizontalScrollBar()->setSingleStep( 1 );
-    horizontalScrollBar()->setPageStep( visibleChars );
-    horizontalScrollBar()->setRange( 0, std::max( 0, maxChars - visibleChars ) );
+    int maxPixels = maxChars * fontMetrics.averageCharWidth();
+    int visibleWidth = viewport()->width() - gutter_width_ - kGutterTextPadding;
+    horizontalScrollBar()->setSingleStep( fontMetrics.averageCharWidth() * 4 );
+    horizontalScrollBar()->setPageStep( visibleWidth );
+    horizontalScrollBar()->setRange( 0, std::max( 0, maxPixels - visibleWidth ) );
 }
 
 auto LargeFileViewer::setPieceTable( PieceTable* pieceTable ) -> void
@@ -420,7 +420,8 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
     int visibleLinesCount = ( viewport()->height() / lineHeight ) + 1;
     int totalLines = line_manager_->getLineCount();
 
-    int scrollX = horizontalScrollBar()->value();
+    int scrollXPx = horizontalScrollBar()->value();
+    int visibleWidth = viewport()->width() - gutter_width_ - kGutterTextPadding;
 
     for( int idx = 0; idx < visibleLinesCount; ++idx ) {
         int currentLineIndex = startLine + idx;
@@ -431,14 +432,69 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
         uint64_t lineStart = line_manager_->getLineOffset( currentLineIndex );
         uint64_t lineLen = line_manager_->getVirtualLineLength( currentLineIndex );
 
-        int charOffset = std::min( scrollX, static_cast<int>( lineLen ) );
-        // We fetch the rest of the visual line (up to MAX_VISUAL_LINE_LENGTH).
-        // This ensures the string reaches the right edge of the window regardless of font width.
-        // QPainter will automatically and efficiently clip what's drawn outside the viewport.
-        int charsToFetch = static_cast<int>( lineLen - charOffset );
+        int estimatedCharOffset = scrollXPx / fontMetrics.averageCharWidth();
+        int charOffset = std::max( 0, estimatedCharOffset - 50 );
+        charOffset = std::min( charOffset, static_cast<int>( lineLen ) );
 
-        QString lineText = QString::fromStdString(
-            piece_table_->getSubstr( lineStart + charOffset, charsToFetch ) );
+        if( charOffset > 0 ) {
+            int checkStart = std::max( 0, charOffset - 4 );
+            int checkLen = charOffset - checkStart + 1;
+            std::string bytes = piece_table_->getSubstr( lineStart + checkStart, checkLen );
+            int bIdx = checkLen - 1;
+            while( bIdx >= 0 && charOffset > 0 ) {
+                unsigned char b = static_cast<unsigned char>( bytes[bIdx] );
+                if( ( b & 0xC0 ) != 0x80 )
+                    break;
+                charOffset--;
+                bIdx--;
+            }
+        }
+
+        int prefixWidth = 0;
+        if( charOffset > 0 ) {
+            std::string rawPrefix = piece_table_->getSubstr( lineStart, charOffset );
+            QString prefixStr = QString::fromUtf8( rawPrefix.data(), rawPrefix.size() );
+            for( int i = 0; i < prefixStr.length(); ++i ) {
+                ushort unicode = prefixStr[i].unicode();
+                if( ( unicode < 32 && unicode != '\t' && unicode != '\n' && unicode != '\r' ) ||
+                    unicode == 127 ) {
+                    prefixStr[i] = QChar( 0xFFFD );
+                }
+            }
+            prefixWidth = fontMetrics.horizontalAdvance( prefixStr );
+        }
+
+        int visibleChars = visibleWidth / fontMetrics.averageCharWidth();
+        int charsToFetch = visibleChars + 100;
+        charsToFetch = std::min( charsToFetch, static_cast<int>( lineLen - charOffset ) );
+
+        if( charOffset + charsToFetch < lineLen ) {
+            std::string nextBytes =
+                piece_table_->getSubstr( lineStart + charOffset + charsToFetch, 4 );
+            if( nextBytes.size() > 0 ) {
+                unsigned char firstB = static_cast<unsigned char>( nextBytes[0] );
+                if( ( firstB & 0xC0 ) == 0x80 ) {
+                    int extraBytes = 1;
+                    while( extraBytes < nextBytes.size() ) {
+                        unsigned char b = static_cast<unsigned char>( nextBytes[extraBytes] );
+                        if( ( b & 0xC0 ) != 0x80 )
+                            break;
+                        extraBytes++;
+                    }
+                    charsToFetch += extraBytes;
+                }
+            }
+        }
+
+        std::string rawChunk = piece_table_->getSubstr( lineStart + charOffset, charsToFetch );
+        QString lineText = QString::fromUtf8( rawChunk.data(), rawChunk.size() );
+        for( int i = 0; i < lineText.length(); ++i ) {
+            ushort unicode = lineText[i].unicode();
+            if( ( unicode < 32 && unicode != '\t' && unicode != '\n' && unicode != '\r' ) ||
+                unicode == 127 ) {
+                lineText[i] = QChar( 0xFFFD );
+            }
+        }
 
         int yBase = idx * lineHeight;
         int yText = yBase + fontMetrics.ascent() + 2;
@@ -448,7 +504,11 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
                           static_cast<int>( Qt::AlignRight | Qt::AlignVCenter ),
                           QString::number( currentLineIndex + 1 ) );
 
-        int textX = gutter_width_ + kGutterTextPadding;
+        painter.save();
+        painter.setClipRect( gutter_width_ + 1, yBase, viewport()->width() - gutter_width_ - 1,
+                             lineHeight );
+
+        int textX = gutter_width_ + kGutterTextPadding - scrollXPx + prefixWidth;
 
         // Search Highlighting
         if( !search_results_.empty() && search_length_ > 0 ) {
@@ -513,6 +573,8 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
                 painter.drawLine( cursorX, yBase + 2, cursorX, yBase + lineHeight - 2 );
             }
         }
+
+        painter.restore();
     }
 }
 
