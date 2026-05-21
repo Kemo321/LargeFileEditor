@@ -45,6 +45,9 @@ signals:
     auto replaceAllRequested( const QString& findText, const QString& replaceText, bool matchCase,
                               bool matchWord ) -> void;
 
+protected:
+    auto mousePressEvent( QMouseEvent* event ) -> void override;
+
 private:
     auto setupUi() -> void;
 

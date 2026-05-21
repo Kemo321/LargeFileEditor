@@ -4,12 +4,13 @@
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QWindow>
+#include <QMouseEvent>
 
 FindReplaceDialog::FindReplaceDialog( QWidget* parent ) : QDialog( parent )
 {
     setWindowTitle( "Find and Replace" );
-    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
-                    Qt::WindowCloseButtonHint | Qt::WindowStaysOnTopHint );
+    setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint );
     setModal( false );
 
     setupUi();
@@ -36,6 +37,16 @@ auto FindReplaceDialog::showReplace() -> void
     show();
     raise();
     activateWindow();
+}
+
+auto FindReplaceDialog::mousePressEvent( QMouseEvent* event ) -> void
+{
+    if( event->button() == Qt::LeftButton ) {
+        if( windowHandle() != nullptr ) {
+            windowHandle()->startSystemMove();
+        }
+        event->accept();
+    }
 }
 
 auto FindReplaceDialog::setupUi() -> void
