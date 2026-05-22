@@ -49,12 +49,24 @@ public:
      */
     uint64_t getVirtualLineLength( int virtual_line );
 
+    /**
+     * @brief Gets the maximum line length encountered so far.
+     */
+    [[nodiscard]] auto getGlobalMaxLineLength() const -> uint64_t;
+
+    /**
+     * @brief Gets a chunk of a line, ensuring UTF-8 boundaries.
+     */
+    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col,
+                                     uint64_t length ) -> std::string;
+
 private:
     void ensureLineCalculated( int target_line );
     void ensureOffsetCalculated( uint64_t target_offset );
 
     PieceTable* pt_;
     int max_visual_line_length_;
+    uint64_t global_max_line_length_{ 0 };
 
     // Cache: virtual line index -> global byte offset
     std::vector<uint64_t> line_start_offsets_;

@@ -135,8 +135,6 @@ private:
     auto paintViewport( QPaintEvent* event ) -> void;
 
     [[nodiscard]] auto getLogicalPosition( int line, int col ) const -> uint64_t;
-    [[nodiscard]] auto getLineText( int line ) const -> QString;
-    [[nodiscard]] auto getLineTextCached( int line ) -> QString;
 
     auto refreshLineOffsets() -> void;
     auto invalidateCache( uint64_t offset = 0 ) -> void;
@@ -151,12 +149,6 @@ private:
 
     QLabel* scrollbar_tooltip_{ nullptr };
 
-    struct CachedLine {
-        int line_;
-        QString text_;
-    };
-    std::vector<CachedLine> line_cache_;
-
     int cursor_line_{ 0 };
     int cursor_col_{ 0 };
     bool cursor_visible_{ true };
@@ -165,4 +157,6 @@ private:
 
     static constexpr int kDefaultGutterWidth = 50;
     int gutter_width_{ kDefaultGutterWidth };
+    int char_width_{ 1 };
+    int line_height_{ 1 };
 };

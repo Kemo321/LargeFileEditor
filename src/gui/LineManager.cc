@@ -16,6 +16,7 @@ void LineManager::reset()
     std::lock_guard<std::mutex> lock( cache_mutex_ );
     line_start_offsets_.clear();
     line_start_offsets_.push_back( 0 );  // Line 0 always starts at offset 0
+    global_max_line_length_ = 0;
 }
 
 void LineManager::invalidateCacheFromOffset( uint64_t offset )
@@ -87,6 +88,15 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
         }
 
         if( current_offset <= file_size && current_offset > line_start_offsets_.back() ) {
+            uint64_t new_len = current_offset - line_start_offsets_.back();
+            if( new_len > 0 ) {
+                std::string last_char = pt_->getSubstr( current_offset - 1, 1 );
+                if( last_char == "\n" )
+                    new_len -= 1;
+            }
+            if( new_len > global_max_line_length_ ) {
+                global_max_line_length_ = new_len;
+            }
             line_start_offsets_.push_back( current_offset );
         }
     }
@@ -198,4 +208,64 @@ uint64_t LineManager::getVirtualLineLength( int virtual_line )
         }
     }
     return length;
+}
+
+auto LineManager::getGlobalMaxLineLength() const -> uint64_t
+{
+    return global_max_line_length_;
+}
+
+auto LineManager::getLineChunk( int virtual_line, uint64_t start_col,
+                                uint64_t length ) -> std::string
+{
+    uint64_t line_len = getVirtualLineLength( virtual_line );
+    if( start_col >= line_len ) {
+        return "";
+    }
+    uint64_t actual_length = std::min( length, line_len - start_col );
+
+    uint64_t line_start = getLineOffset( virtual_line );
+    uint64_t chunk_start = line_start + start_col;
+
+    // UTF-8 backward snapping for start
+    if( actual_length > 0 && chunk_start > line_start ) {
+        int back_offset = 0;
+        while( back_offset < 4 && chunk_start >= line_start + back_offset ) {
+            std::string b = pt_->getSubstr( chunk_start - back_offset, 1 );
+            if( b.empty() )
+                break;
+            unsigned char byte = static_cast<unsigned char>( b[0] );
+            if( ( byte & 0xC0 ) != 0x80 ) {
+                chunk_start -= back_offset;
+                actual_length += back_offset;
+                break;
+            }
+            back_offset++;
+        }
+    }
+
+    std::string chunk = pt_->getSubstr( chunk_start, actual_length );
+
+    // UTF-8 forward snapping for end
+    if( chunk_start + actual_length < line_start + line_len ) {
+        std::string next_b = pt_->getSubstr( chunk_start + actual_length, 1 );
+        if( !next_b.empty() ) {
+            unsigned char byte = static_cast<unsigned char>( next_b[0] );
+            if( ( byte & 0xC0 ) == 0x80 ) {
+                int extra = 0;
+                while( extra < 4 && chunk_start + actual_length + extra < line_start + line_len ) {
+                    std::string b = pt_->getSubstr( chunk_start + actual_length + extra, 1 );
+                    if( b.empty() )
+                        break;
+                    unsigned char check_byte = static_cast<unsigned char>( b[0] );
+                    if( ( check_byte & 0xC0 ) != 0x80 )
+                        break;
+                    extra++;
+                }
+                chunk += pt_->getSubstr( chunk_start + actual_length, extra );
+            }
+        }
+    }
+
+    return chunk;
 }
