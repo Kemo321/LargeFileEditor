@@ -157,6 +157,4 @@ private:
 
     static constexpr int kDefaultGutterWidth = 50;
     int gutter_width_{ kDefaultGutterWidth };
-    int char_width_{ 1 };
-    int line_height_{ 1 };
 };

@@ -1,13 +1,13 @@
 #include "gui/LargeFileViewer.h"
 
 #include <QCursor>
-#include <QFontDatabase>
 #include <QPainter>
 #include <QScrollBar>
 #include <QStyle>
 #include <QToolTip>
 #include <QWheelEvent>
 #include <algorithm>
+#include <QFontDatabase>
 
 static constexpr int kCursorBlinkRateMs = 500;
 static constexpr int kLineOffsetDelayMs = 300;
@@ -24,7 +24,7 @@ LargeFileViewer::LargeFileViewer( QWidget* parent ) : QAbstractScrollArea( paren
     QFont fixedFont = QFontDatabase::systemFont( QFontDatabase::FixedFont );
     setFont( fixedFont );
 
-    setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
+    setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     setHorizontalScrollBarPolicy( Qt::ScrollBarAsNeeded );
 
     cursor_timer_ = new QTimer( this );
@@ -71,12 +71,6 @@ auto LargeFileViewer::eventFilter( QObject* obj, QEvent* event ) -> bool
 
 auto LargeFileViewer::resizeEvent( QResizeEvent* event ) -> void
 {
-    QFontMetrics fontMetrics( font() );
-    char_width_ = fontMetrics.horizontalAdvance( 'A' );
-    if( char_width_ <= 0 )
-        char_width_ = 1;
-    line_height_ = fontMetrics.height() + kLineHeightPadding;
-
     QAbstractScrollArea::resizeEvent( event );
     refreshLineOffsets();
 }
@@ -158,18 +152,23 @@ auto LargeFileViewer::refreshLineOffsets() -> void
         return;
     }
 
+    QFontMetrics fontMetrics( font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
+    int charWidth = fontMetrics.horizontalAdvance( 'A' );
+    if (charWidth <= 0) charWidth = 1;
+
     int totalLines = line_manager_->getLineCount();
-    int visibleLines = viewport()->height() / line_height_;
+    int visibleLines = viewport()->height() / lineHeight;
 
     verticalScrollBar()->setSingleStep( 1 );
     verticalScrollBar()->setPageStep( visibleLines );
     verticalScrollBar()->setRange( 0, std::max( 0, totalLines - visibleLines ) );
 
     int maxChars = static_cast<int>( line_manager_->getGlobalMaxLineLength() );
-    int maxPixels = maxChars * char_width_;
+    int maxPixels = maxChars * charWidth;
     int visibleWidth = viewport()->width() - gutter_width_ - kGutterTextPadding;
-
-    horizontalScrollBar()->setSingleStep( char_width_ * 4 );
+    
+    horizontalScrollBar()->setSingleStep( charWidth * 4 );
     horizontalScrollBar()->setPageStep( visibleWidth );
     horizontalScrollBar()->setRange( 0, std::max( 0, maxPixels - visibleWidth ) );
 }
@@ -179,8 +178,10 @@ auto LargeFileViewer::setPieceTable( PieceTable* pieceTable ) -> void
     piece_table_ = pieceTable;
     if( piece_table_ ) {
         line_manager_ = std::make_unique<LineManager>( piece_table_ );
+        setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
     } else {
         line_manager_.reset();
+        setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     }
     cursor_line_ = 0;
     cursor_col_ = 0;
@@ -215,8 +216,13 @@ auto LargeFileViewer::setCursorPosition( int line, int col ) -> void
 
 auto LargeFileViewer::scrollToCursor() -> void
 {
+    QFontMetrics fontMetrics( font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
+    int charWidth = fontMetrics.horizontalAdvance( 'A' );
+    if (charWidth <= 0) charWidth = 1;
+
     int currentScroll = verticalScrollBar()->value();
-    int visibleLinesCount = viewport()->height() / line_height_;
+    int visibleLinesCount = viewport()->height() / lineHeight;
 
     if( cursor_line_ < currentScroll ) {
         verticalScrollBar()->setValue( cursor_line_ );
@@ -226,12 +232,12 @@ auto LargeFileViewer::scrollToCursor() -> void
 
     int currentHScroll = horizontalScrollBar()->value();
     int visibleWidth = viewport()->width() - gutter_width_ - kGutterTextPadding;
-
-    int cursorPx = cursor_col_ * char_width_;
-    int margin = char_width_ * 2;
+    
+    int cursorPx = cursor_col_ * charWidth;
+    int margin = charWidth * 2; 
 
     if( cursorPx < currentHScroll ) {
-        horizontalScrollBar()->setValue( std::max( 0, cursorPx - margin ) );
+        horizontalScrollBar()->setValue( std::max(0, cursorPx - margin) );
     } else if( cursorPx > currentHScroll + visibleWidth - margin ) {
         horizontalScrollBar()->setValue( cursorPx - visibleWidth + margin );
     }
@@ -380,33 +386,35 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
         return;
     }
 
-    int clickedLineOffset = static_cast<int>( event->position().y() ) / line_height_;
+    QFontMetrics fontMetrics( font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
+    int charWidth = fontMetrics.horizontalAdvance( 'A' );
+    if (charWidth <= 0) charWidth = 1;
+
+    int clickedLineOffset = static_cast<int>( event->position().y() ) / lineHeight;
     int targetLine = verticalScrollBar()->value() + clickedLineOffset;
 
     if( targetLine < line_manager_->getLineCount() ) {
         cursor_line_ = targetLine;
-
+        
         int textX = static_cast<int>( event->position().x() ) - gutter_width_ - kGutterTextPadding;
         int scrollXPx = horizontalScrollBar()->value();
         int totalPx = textX + scrollXPx;
-
-        int approx_col = totalPx / char_width_;
-        if( approx_col < 0 )
-            approx_col = 0;
-
+        
+        int approx_col = totalPx / charWidth;
+        if (approx_col < 0) approx_col = 0;
+        
         uint64_t lineLen = line_manager_->getVirtualLineLength( cursor_line_ );
-        if( approx_col > static_cast<int>( lineLen ) )
-            approx_col = static_cast<int>( lineLen );
+        if (approx_col > static_cast<int>(lineLen)) approx_col = static_cast<int>(lineLen);
 
         uint64_t lineStart = line_manager_->getLineOffset( cursor_line_ );
-
+        
         // Snap approx_col back to a UTF-8 character boundary
-        if( approx_col > 0 && approx_col < static_cast<int>( lineLen ) ) {
+        if( approx_col > 0 && approx_col < static_cast<int>(lineLen) ) {
             int back_offset = 0;
             while( back_offset < 4 && approx_col >= back_offset ) {
                 std::string b = piece_table_->getSubstr( lineStart + approx_col - back_offset, 1 );
-                if( b.empty() )
-                    break;
+                if( b.empty() ) break;
                 unsigned char byte = static_cast<unsigned char>( b[0] );
                 if( ( byte & 0xC0 ) != 0x80 ) {
                     approx_col -= back_offset;
@@ -415,7 +423,7 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
                 back_offset++;
             }
         }
-
+        
         cursor_col_ = approx_col;
     }
 
@@ -436,19 +444,23 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
         return;
     }
 
+    QFontMetrics fontMetrics( font() );
+    int lineHeight = fontMetrics.height() + kLineHeightPadding;
+    int charWidth = fontMetrics.horizontalAdvance( 'A' );
+    if (charWidth <= 0) charWidth = 1;
+
     painter.fillRect( 0, 0, gutter_width_, viewport()->height(), QColor( "#f0f0f0" ) );
     painter.setPen( QColor( "#d0d0d0" ) );
     painter.drawLine( gutter_width_, 0, gutter_width_, viewport()->height() );
 
-    QFontMetrics fontMetrics( font() );
     int startLine = verticalScrollBar()->value();
-    int visibleLinesCount = ( viewport()->height() / line_height_ ) + 1;
+    int visibleLinesCount = ( viewport()->height() / lineHeight ) + 1;
     int totalLines = line_manager_->getLineCount();
 
     int scrollXPx = horizontalScrollBar()->value();
-    int start_col_byte = scrollXPx / char_width_;
-    int px_offset = scrollXPx % char_width_;
-    int visible_cols = ( viewport()->width() - gutter_width_ ) / char_width_;
+    int start_col_byte = scrollXPx / charWidth;
+    int px_offset = scrollXPx % charWidth;
+    int visible_cols = ( viewport()->width() - gutter_width_ ) / charWidth;
 
     for( int idx = 0; idx < visibleLinesCount; ++idx ) {
         int currentLineIndex = startLine + idx;
@@ -457,52 +469,38 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
         }
 
         uint64_t lineStart = line_manager_->getLineOffset( currentLineIndex );
-
-        // Fetch chunk: slightly more to cover margins
+        
         int fetch_length = visible_cols + 10;
-        std::string rawChunk =
-            line_manager_->getLineChunk( currentLineIndex, start_col_byte, fetch_length );
-
-        // Convert to QString, replace unprintable
+        std::string rawChunk = line_manager_->getLineChunk( currentLineIndex, start_col_byte, fetch_length );
+        
         QString lineText = QString::fromUtf8( rawChunk.data(), rawChunk.size() );
         for( int i = 0; i < lineText.length(); ++i ) {
             ushort unicode = lineText[i].unicode();
-            if( ( unicode < 32 && unicode != '\t' && unicode != '\n' && unicode != '\r' ) ||
-                unicode == 127 ) {
+            if( ( unicode < 32 && unicode != '\t' && unicode != '\n' && unicode != '\r' ) || unicode == 127 ) {
                 lineText[i] = QChar( 0xFFFD );
             }
         }
 
-        int yBase = idx * line_height_;
+        int yBase = idx * lineHeight;
         int yText = yBase + fontMetrics.ascent() + 2;
 
         painter.setPen( QColor( "#808080" ) );
-        painter.drawText( QRect( 0, yBase, gutter_width_ - kLineHeightPadding, line_height_ ),
+        painter.drawText( QRect( 0, yBase, gutter_width_ - kLineHeightPadding, lineHeight ),
                           static_cast<int>( Qt::AlignRight | Qt::AlignVCenter ),
                           QString::number( currentLineIndex + 1 ) );
 
         painter.save();
-        painter.setClipRect( gutter_width_ + 1, yBase, viewport()->width() - gutter_width_ - 1,
-                             line_height_ );
+        painter.setClipRect( gutter_width_ + 1, yBase, viewport()->width() - gutter_width_ - 1, lineHeight );
 
-        // We draw the text exactly at our negative offset
-        // Wait: what if getLineChunk snapped backwards?
-        // If it snapped back by `B` bytes, those bytes are at the start of rawChunk.
-        // We need to shift our draw position left by the visual width of those snapped bytes.
-        // Let's calculate the exact byte start of the chunk to find out how much it snapped.
         uint64_t line_len = line_manager_->getVirtualLineLength( currentLineIndex );
         uint64_t chunk_start_byte = start_col_byte;
-        if( chunk_start_byte > line_len )
-            chunk_start_byte = line_len;
-
-        // Simulate the backwards snap to find chunk_start_byte
+        if (chunk_start_byte > line_len) chunk_start_byte = line_len;
+        
         if( chunk_start_byte > 0 ) {
             int back_offset = 0;
             while( back_offset < 4 && chunk_start_byte >= back_offset ) {
-                std::string b =
-                    piece_table_->getSubstr( lineStart + chunk_start_byte - back_offset, 1 );
-                if( b.empty() )
-                    break;
+                std::string b = piece_table_->getSubstr( lineStart + chunk_start_byte - back_offset, 1 );
+                if( b.empty() ) break;
                 unsigned char byte = static_cast<unsigned char>( b[0] );
                 if( ( byte & 0xC0 ) != 0x80 ) {
                     chunk_start_byte -= back_offset;
@@ -513,16 +511,13 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
         }
 
         int textX = gutter_width_ + kGutterTextPadding - px_offset;
-
-        // If we snapped backward, chunk_start_byte < start_col_byte.
-        // We must shift textX to the left so that start_col_byte remains at the correct pixel.
-        if( chunk_start_byte < static_cast<uint64_t>( start_col_byte ) ) {
-            std::string prefix = rawChunk.substr( 0, start_col_byte - chunk_start_byte );
-            QString qPrefix = QString::fromUtf8( prefix.data(), prefix.size() );
-            textX -= fontMetrics.horizontalAdvance( qPrefix );
+        
+        if (chunk_start_byte < static_cast<uint64_t>(start_col_byte)) {
+            std::string prefix = rawChunk.substr(0, start_col_byte - chunk_start_byte);
+            QString qPrefix = QString::fromUtf8(prefix.data(), prefix.size());
+            textX -= fontMetrics.horizontalAdvance(qPrefix);
         }
 
-        // Search Highlighting
         if( !search_results_.empty() && search_length_ > 0 ) {
             auto it = std::lower_bound( search_results_.begin(), search_results_.end(), lineStart );
             int indexOffset = std::distance( search_results_.begin(), it );
@@ -531,26 +526,20 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
                 uint64_t matchPos = *it;
                 int matchCol = static_cast<int>( matchPos - lineStart );
 
-                if( matchCol + search_length_ > chunk_start_byte &&
-                    matchCol < chunk_start_byte + rawChunk.size() ) {
-                    int visMatchStart =
-                        std::max( 0, matchCol - static_cast<int>( chunk_start_byte ) );
-                    int visMatchEnd = std::min(
-                        static_cast<int>( rawChunk.size() ),
-                        matchCol + search_length_ - static_cast<int>( chunk_start_byte ) );
+                if( matchCol + search_length_ > chunk_start_byte && matchCol < chunk_start_byte + rawChunk.size() ) {
+                    int visMatchStart = std::max( 0, matchCol - static_cast<int>(chunk_start_byte) );
+                    int visMatchEnd = std::min( static_cast<int>(rawChunk.size()), matchCol + search_length_ - static_cast<int>(chunk_start_byte) );
                     int matchLen = visMatchEnd - visMatchStart;
 
                     if( matchLen > 0 ) {
-                        std::string prefixRaw = rawChunk.substr( 0, visMatchStart );
-                        std::string matchRaw = rawChunk.substr( visMatchStart, matchLen );
-                        int startX = textX + fontMetrics.horizontalAdvance( QString::fromUtf8(
-                                                 prefixRaw.data(), prefixRaw.size() ) );
-                        int wordWidth = fontMetrics.horizontalAdvance(
-                            QString::fromUtf8( matchRaw.data(), matchRaw.size() ) );
+                        std::string prefixRaw = rawChunk.substr(0, visMatchStart);
+                        std::string matchRaw = rawChunk.substr(visMatchStart, matchLen);
+                        int startX = textX + fontMetrics.horizontalAdvance( QString::fromUtf8(prefixRaw.data(), prefixRaw.size()) );
+                        int wordWidth = fontMetrics.horizontalAdvance( QString::fromUtf8(matchRaw.data(), matchRaw.size()) );
 
                         bool isActive = ( indexOffset == active_search_index_ );
                         QColor bgColor = isActive ? QColor( 255, 215, 0 ) : QColor( 255, 255, 200 );
-                        painter.fillRect( startX, yBase + 2, wordWidth, line_height_ - 4, bgColor );
+                        painter.fillRect( startX, yBase + 2, wordWidth, lineHeight - 4, bgColor );
                     }
                 }
                 ++it;
@@ -560,16 +549,12 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
 
         if( !mock_highlight_words_.isEmpty() ) {
             for( const QString& word : mock_highlight_words_ ) {
-                if( word.isEmpty() )
-                    continue;
+                if( word.isEmpty() ) continue;
                 int matchIdx = 0;
-                while( ( matchIdx = lineText.indexOf( word, matchIdx, Qt::CaseInsensitive ) ) !=
-                       -1 ) {
+                while( ( matchIdx = lineText.indexOf( word, matchIdx, Qt::CaseInsensitive ) ) != -1 ) {
                     int startX = textX + fontMetrics.horizontalAdvance( lineText.left( matchIdx ) );
-                    int wordWidth =
-                        fontMetrics.horizontalAdvance( lineText.mid( matchIdx, word.length() ) );
-                    painter.fillRect( startX, yBase + 2, wordWidth, line_height_ - 4,
-                                      QColor( 255, 255, 0, 150 ) );
+                    int wordWidth = fontMetrics.horizontalAdvance( lineText.mid( matchIdx, word.length() ) );
+                    painter.fillRect( startX, yBase + 2, wordWidth, lineHeight - 4, QColor( 255, 255, 0, 150 ) );
                     matchIdx += word.length();
                 }
             }
@@ -579,14 +564,12 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
         painter.drawText( textX, yText, lineText );
 
         if( currentLineIndex == cursor_line_ && hasFocus() && cursor_visible_ ) {
-            if( cursor_col_ >= chunk_start_byte &&
-                cursor_col_ <= chunk_start_byte + rawChunk.size() ) {
+            if( cursor_col_ >= chunk_start_byte && cursor_col_ <= chunk_start_byte + rawChunk.size() ) {
                 int cursorVisOffset = cursor_col_ - chunk_start_byte;
-                std::string prefixRaw = rawChunk.substr( 0, cursorVisOffset );
-                int cursorX = textX + fontMetrics.horizontalAdvance(
-                                          QString::fromUtf8( prefixRaw.data(), prefixRaw.size() ) );
+                std::string prefixRaw = rawChunk.substr(0, cursorVisOffset);
+                int cursorX = textX + fontMetrics.horizontalAdvance( QString::fromUtf8(prefixRaw.data(), prefixRaw.size()) );
                 painter.setPen( Qt::black );
-                painter.drawLine( cursorX, yBase + 2, cursorX, yBase + line_height_ - 2 );
+                painter.drawLine( cursorX, yBase + 2, cursorX, yBase + lineHeight - 2 );
             }
         }
 

@@ -561,6 +561,7 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
                                                   matchCase, matchWord );
 
     if( replaced > 0 ) {
+        current_find_results_.clear();
         viewer_->refreshView();
         current_find_text_ = "";
         task_status_label_->setText(
