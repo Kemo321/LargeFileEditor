@@ -430,13 +430,15 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
     QPainter painter( viewport() );
     painter.fillRect( event->rect(), Qt::white );
 
+    if( piece_table_ == nullptr || !line_manager_ ) {
+        painter.setPen( Qt::gray );
+        painter.drawText( viewport()->rect(), Qt::AlignCenter, "Please open a file (File -> Open or Ctrl+O)" );
+        return;
+    }
+
     painter.fillRect( 0, 0, gutter_width_, viewport()->height(), QColor( "#f0f0f0" ) );
     painter.setPen( QColor( "#d0d0d0" ) );
     painter.drawLine( gutter_width_, 0, gutter_width_, viewport()->height() );
-
-    if( piece_table_ == nullptr || !line_manager_ ) {
-        return;
-    }
 
     QFontMetrics fontMetrics( font() );
     int startLine = verticalScrollBar()->value();

@@ -65,6 +65,7 @@ private:
     auto createStatusBar() -> void;
     auto updateWindowTitle() -> void;
     auto processFindResults() -> void;
+    auto isBinaryFile( const QString& filePath ) -> bool;
 
     LargeFileViewer* viewer_;
     FindReplaceDialog* find_replace_dialog_{};

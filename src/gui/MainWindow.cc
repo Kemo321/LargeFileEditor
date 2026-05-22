@@ -216,6 +216,22 @@ auto MainWindow::openFile() -> void
         task_progress_bar_->show();
         task_progress_bar_->setRange( 0, 0 );
 
+        if( isBinaryFile( fileName ) ) {
+            task_progress_bar_->hide();
+            task_status_label_->setText( "Unsupported file type: Binary" );
+            QMessageBox::warning( this, "Unsupported File", "Unsupported file type: Binary files are not supported." );
+            current_filename_ = "";
+            current_find_text_ = "";
+            current_find_index_ = -1;
+            current_find_results_.clear();
+            piece_table_ = nullptr;
+            viewer_->setPieceTable( nullptr );
+            viewer_->setEnabled( false );
+            setWindowModified( false );
+            updateWindowTitle();
+            return;
+        }
+
         current_filename_ = fileName;
         current_find_text_ = "";
         current_find_index_ = -1;
@@ -237,6 +253,90 @@ auto MainWindow::openFile() -> void
 
         task_progress_bar_->hide();
     }
+}
+
+auto MainWindow::isBinaryFile( const QString& filePath ) -> bool
+{
+    QFile file( filePath );
+    if( !file.open( QIODevice::ReadOnly ) ) {
+        return false;
+    }
+    QByteArray chunk = file.read( 4096 );
+    file.close();
+
+    if( chunk.isEmpty() ) {
+        return false;
+    }
+
+    int nullBytes = 0;
+    int controlCount = 0;
+
+    for( int i = 0; i < chunk.size(); ++i ) {
+        unsigned char uc = static_cast<unsigned char>( chunk.at( i ) );
+        if( uc == '\0' ) {
+            nullBytes++;
+        } else if( uc < 32 ) {
+            if( uc != '\t' && uc != '\n' && uc != '\r' ) {
+                controlCount++;
+            }
+        } else if( uc == 127 ) {
+            controlCount++;
+        }
+    }
+
+    if( nullBytes > 0 ) {
+        return true;
+    }
+
+    int invalidUtf8Count = 0;
+    int i = 0;
+    while( i < chunk.size() ) {
+        unsigned char b1 = static_cast<unsigned char>( chunk.at( i ) );
+        if( b1 < 128 ) {
+            i++;
+            continue;
+        }
+
+        int seq_len = 0;
+        if( ( b1 & 0xE0 ) == 0xC0 ) {
+            seq_len = 2;
+        } else if( ( b1 & 0xF0 ) == 0xE0 ) {
+            seq_len = 3;
+        } else if( ( b1 & 0xF8 ) == 0xF0 ) {
+            seq_len = 4;
+        } else {
+            invalidUtf8Count++;
+            i++;
+            continue;
+        }
+
+        if( i + seq_len > chunk.size() ) {
+            break;
+        }
+
+        bool valid_seq = true;
+        for( int j = 1; j < seq_len; ++j ) {
+            unsigned char bj = static_cast<unsigned char>( chunk.at( i + j ) );
+            if( ( bj & 0xC0 ) != 0x80 ) {
+                valid_seq = false;
+                break;
+            }
+        }
+
+        if( !valid_seq ) {
+            invalidUtf8Count++;
+            i++;
+        } else {
+            i += seq_len;
+        }
+    }
+
+    double nonTextRatio = static_cast<double>( controlCount + invalidUtf8Count ) / chunk.size();
+    if( nonTextRatio > 0.15 ) {
+        return true;
+    }
+
+    return false;
 }
 
 auto MainWindow::saveFile() -> void
