@@ -781,3 +781,44 @@ TEST_F( PieceTableTest, ReplaceAllCoalescesFragmentedTable )
     EXPECT_EQ( pieceTable.getText(), "ab ab ab ab ab ab " );
     EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
 }
+
+TEST_F( PieceTableTest, FindPieceAtBinarySearchRoundTrip )
+{
+    // O(log n) findPieceAt: across a heavily fragmented table, getSubstr (which routes through
+    // findPieceAt + the cumulative-offset index) must agree with a flat getText() for every
+    // position, length, and piece boundary.
+    PieceTable pieceTable( createTempFile( "0123456789" ) );
+    for( int idx = 0; idx < 12; idx++ ) {
+        // Interleave inserts at varied positions to splinter the table into many pieces.
+        pieceTable.insert( static_cast<uint64_t>( idx ) % ( pieceTable.size() + 1 ),
+                           "<" + std::to_string( idx ) + ">" );
+    }
+
+    const std::string flat = pieceTable.getText();
+    ASSERT_EQ( pieceTable.size(), flat.size() );
+
+    for( uint64_t pos = 0; pos < flat.size(); ++pos ) {
+        for( uint64_t len : { uint64_t{ 1 }, uint64_t{ 3 }, flat.size() - pos } ) {
+            if( pos + len > flat.size() ) {
+                continue;
+            }
+            EXPECT_EQ( pieceTable.getSubstr( pos, len ), flat.substr( pos, len ) )
+                << "pos=" << pos << " len=" << len;
+        }
+    }
+}
+
+TEST_F( PieceTableTest, FindPieceAtBoundaryAndOutOfRange )
+{
+    PieceTable pieceTable( createTempFile( "abcdef" ) );
+    pieceTable.insert( 3, "XYZ" );  // fragment into multiple pieces
+
+    const uint64_t end = pieceTable.size();
+    // position == size(): findPieceAt returns the past-the-end sentinel; a zero-length read is "".
+    EXPECT_EQ( pieceTable.getSubstr( end, 0 ), "" );
+    // Last byte is still reachable.
+    EXPECT_EQ( pieceTable.getSubstr( end - 1, 1 ), pieceTable.getText().substr( end - 1, 1 ) );
+    // Reading past the end throws.
+    EXPECT_THROW( pieceTable.getSubstr( end, 1 ), std::out_of_range );
+    EXPECT_THROW( pieceTable.getSubstr( end + 5, 1 ), std::out_of_range );
+}

@@ -240,8 +240,10 @@ private:
     [[nodiscard]] auto findPieceAt( uint64_t position ) const -> FindResult;
     auto splitPiece( size_t pieceIndex, uint64_t offset ) -> void;
 
-    // Recomputes total_size_ from pieces_ (used after undo/redo swap a whole snapshot).
-    auto recalculateSize() -> void;
+    // Rebuilds pieceStartOffsets_ (prefix sums of piece lengths) in one O(pieces) pass and
+    // sets total_size_ = pieceStartOffsets_.back(). Single source of truth for size + offsets;
+    // must be called after every structural change to pieces_.
+    auto rebuildOffsetIndex() -> void;
 
     // Merges adjacent pieces that reference contiguous spans of the same buffer, shrinking
     // pieces_ after a fragmenting batch operation (length-preserving; total_size_ untouched).
@@ -256,6 +258,11 @@ private:
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
+
+    // Prefix sums of piece lengths: pieceStartOffsets_[i] is the logical start of pieces_[i],
+    // size() == pieceStartOffsets_.size() - 1, and pieceStartOffsets_.back() == total_size_.
+    // Enables O(log n) findPieceAt via binary search.
+    std::vector<uint64_t> pieceStartOffsets_{ 0 };
 
     uint64_t total_size_{ 0 };  // cached sum of piece lengths; size() returns this in O(1)
 
