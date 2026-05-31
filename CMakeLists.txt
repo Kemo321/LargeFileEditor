@@ -25,9 +25,11 @@ set(SOURCES
     src/backend/PieceTable.cc
     src/gui/MainWindow.cc
     src/gui/LargeFileViewer.cc
+    src/gui/LineManager.cc
     src/gui/FindReplaceDialog.cc
     include/gui/MainWindow.h
     include/gui/LargeFileViewer.h
+    include/gui/LineManager.h
     include/gui/FindReplaceDialog.h
     include/backend/PieceTable.h)
 include_directories(include)

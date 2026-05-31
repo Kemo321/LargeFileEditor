@@ -18,9 +18,11 @@
 #include <QStringList>
 #include <QTimer>
 #include <QWidget>
+#include <memory>
 #include <vector>
 
 #include "backend/PieceTable.h"
+#include "gui/LineManager.h"
 
 /**
  * @class LargeFileViewer
@@ -44,6 +46,15 @@ public:
     auto setMockHighlights( const QStringList& words ) -> void;
 
     /**
+     * @brief Sets search results and the currently active index to highlight.
+     * @param searchResults List of logical byte offsets where the search string occurs.
+     * @param activeIndex The index in searchResults that is currently active.
+     * @param searchLength Length of the search string.
+     */
+    auto setSearchHighlights( const std::vector<uint64_t>& searchResults, int activeIndex,
+                              int searchLength ) -> void;
+
+    /**
      * @brief Attaches a backend PieceTable instance to this viewer.
      * @param pieceTable Pointer to initialized piece table.
      */
@@ -64,13 +75,23 @@ public:
     /**
      * @brief Translates a logical byte position to view coordinates and jumps to it.
      * @param pos Logical byte position.
+     * @param matchLength Byte length of the match to ensure full visibility (0 = cursor only).
      */
-    auto jumpToLogicalPosition( uint64_t pos ) -> void;
+    auto jumpToLogicalPosition( uint64_t pos, int matchLength = 0 ) -> void;
 
     /**
      * @brief Forces a complete repaint and cache invalidation.
      */
     auto refreshView() -> void;
+
+    /**
+     * @brief Suspends/resumes rendering while a background task mutates the backend.
+     *
+     * While busy the viewer must not read the PieceTable (a worker thread owns it),
+     * so painting and line-offset refreshes are skipped and the cursor blink is paused.
+     * @param busy True to suspend rendering, false to resume.
+     */
+    auto setBusy( bool busy ) -> void;
 
 signals:
     /**
@@ -101,6 +122,12 @@ protected:
     auto resizeEvent( QResizeEvent* event ) -> void override;
 
     /**
+     * @brief Handles font and other property changes to refresh layout metrics.
+     * @param event The change event.
+     */
+    auto changeEvent( QEvent* event ) -> void override;
+
+    /**
      * @brief Handles mouse wheel events for scrolling.
      * @param event The wheel event.
      */
@@ -124,23 +151,19 @@ private:
     auto paintViewport( QPaintEvent* event ) -> void;
 
     [[nodiscard]] auto getLogicalPosition( int line, int col ) const -> uint64_t;
-    [[nodiscard]] auto getLineText( int line ) const -> QString;
-    [[nodiscard]] auto getLineTextCached( int line ) -> QString;
 
     auto refreshLineOffsets() -> void;
-    auto invalidateCache() -> void;
+    auto invalidateCache( uint64_t offset = 0 ) -> void;
 
     PieceTable* piece_table_{ nullptr };
+    std::unique_ptr<LineManager> line_manager_;
     QStringList mock_highlight_words_;
-    std::vector<uint64_t> line_offsets_;
+
+    std::vector<uint64_t> search_results_;
+    int active_search_index_{ -1 };
+    int search_length_{ 0 };
 
     QLabel* scrollbar_tooltip_{ nullptr };
-
-    struct CachedLine {
-        int line_;
-        QString text_;
-    };
-    std::vector<CachedLine> line_cache_;
 
     int cursor_line_{ 0 };
     int cursor_col_{ 0 };
@@ -148,6 +171,7 @@ private:
     QTimer* cursor_timer_{ nullptr };
     QTimer* line_offset_timer_{ nullptr };
 
-    static constexpr int kDefaultGutterWidth = 50;
-    int gutter_width_{ kDefaultGutterWidth };
+    bool render_busy_{ false };
+
+    int gutter_width_{ 60 };
 };

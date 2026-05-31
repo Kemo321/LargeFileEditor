@@ -15,6 +15,7 @@
 static constexpr uint64_t kEstimatedLineLength = 50;
 static constexpr uint64_t kMaxPreallocation = 512ULL * 1024ULL * 1024ULL;
 static constexpr size_t kMaxUndoHistory = 100;
+static constexpr uint64_t kMaxUndoBytes = 256ULL * 1024ULL * 1024ULL;
 
 PieceTable::PieceTable() = default;
 
@@ -22,15 +23,9 @@ PieceTable::PieceTable( const std::string& filePath )
 {
     openMmap( filePath );
     if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr && mmapSize_ > 0 ) {
-        originalNewlines_.reserve( mmapSize_ / kEstimatedLineLength );
-        for( uint64_t idx = 0; idx < mmapSize_; ++idx ) {
-            if( originalBuffer_[idx] == '\n' ) {
-                originalNewlines_.push_back( idx );
-            }
-        }
-        pieces_.push_back( { BufferType::Original, 0, mmapSize_,
-                             static_cast<uint32_t>( originalNewlines_.size() ) } );
+        pieces_.push_back( { BufferType::Original, 0, mmapSize_ } );
     }
+    rebuildOffsetIndex();
 }
 
 PieceTable::~PieceTable()
@@ -71,9 +66,42 @@ auto PieceTable::closeMmap() -> void
 
 auto PieceTable::size() const -> uint64_t
 {
-    return std::accumulate(
-        pieces_.begin(), pieces_.end(), 0ULL,
-        []( uint64_t acc, const Piece& piece ) -> uint64_t { return acc + piece.length_; } );
+    return total_size_;
+}
+
+auto PieceTable::rebuildOffsetIndex() -> void
+{
+    pieceStartOffsets_.resize( pieces_.size() + 1 );
+    uint64_t running = 0;
+    for( size_t idx = 0; idx < pieces_.size(); ++idx ) {
+        pieceStartOffsets_[idx] = running;
+        running += pieces_[idx].length_;
+    }
+    pieceStartOffsets_.back() = running;
+    total_size_ = running;
+}
+
+auto PieceTable::coalescePieces() -> void
+{
+    if( pieces_.size() < 2 ) {
+        return;
+    }
+    std::vector<Piece> merged;
+    merged.reserve( pieces_.size() );
+    for( const Piece& piece : pieces_ ) {
+        if( piece.length_ == 0 ) {
+            continue;
+        }
+        if( !merged.empty() ) {
+            Piece& back = merged.back();
+            if( back.type_ == piece.type_ && back.start_ + back.length_ == piece.start_ ) {
+                back.length_ += piece.length_;  // contiguous same-buffer run -> extend
+                continue;
+            }
+        }
+        merged.push_back( piece );
+    }
+    pieces_ = std::move( merged );
 }
 
 auto PieceTable::getText() const -> std::string
@@ -124,17 +152,16 @@ auto PieceTable::getSubstr( uint64_t position, uint64_t length ) const -> std::s
 
 auto PieceTable::findPieceAt( uint64_t position ) const -> FindResult
 {
-    uint64_t currentPos = 0;
-    for( size_t idx = 0; idx < pieces_.size(); ++idx ) {
-        if( position >= currentPos && position < currentPos + pieces_[idx].length_ ) {
-            return { idx, position - currentPos };
+    if( position >= total_size_ ) {
+        if( position == total_size_ ) {
+            return { pieces_.size(), 0 };
         }
-        currentPos += pieces_[idx].length_;
+        throw std::out_of_range( "Position out of bounds" );
     }
-    if( position == currentPos ) {
-        return { pieces_.size(), 0 };
-    }
-    throw std::out_of_range( "Position out of bounds" );
+    // pieceStartOffsets_ is sorted ascending; find the piece whose span contains position.
+    auto iter = std::upper_bound( pieceStartOffsets_.begin(), pieceStartOffsets_.end(), position );
+    auto idx = static_cast<size_t>( std::distance( pieceStartOffsets_.begin(), iter ) ) - 1;
+    return { idx, position - pieceStartOffsets_[idx] };
 }
 
 auto PieceTable::splitPiece( size_t pieceIndex, uint64_t offset ) -> void
@@ -144,17 +171,9 @@ auto PieceTable::splitPiece( size_t pieceIndex, uint64_t offset ) -> void
     }
 
     Piece& orig = pieces_[pieceIndex];
-    const auto& newlines =
-        ( orig.type_ == BufferType::Original ) ? originalNewlines_ : addNewlines_;
 
-    auto iter1 = std::lower_bound( newlines.begin(), newlines.end(), orig.start_ );
-    auto iter2 = std::lower_bound( iter1, newlines.end(), orig.start_ + offset );
-    auto left_lines = static_cast<uint32_t>( std::distance( iter1, iter2 ) );
-
-    Piece nextPiece = { orig.type_, orig.start_ + offset, orig.length_ - offset,
-                        orig.line_count_ - left_lines };
+    Piece nextPiece = { orig.type_, orig.start_ + offset, orig.length_ - offset };
     orig.length_ = offset;
-    orig.line_count_ = left_lines;
 
     pieces_.insert( pieces_.begin() + static_cast<std::ptrdiff_t>( pieceIndex ) + 1, nextPiece );
 }
@@ -175,16 +194,8 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
     addBuffer_.append( text );
     const auto textLength = static_cast<uint64_t>( text.length() );
 
-    uint32_t line_count = 0;
-    for( uint32_t idx = 0; idx < textLength; ++idx ) {
-        if( text[idx] == '\n' ) {
-            addNewlines_.push_back( startInAdd + idx );
-            line_count++;
-        }
-    }
-
     if( position == currentSize ) {
-        pieces_.push_back( { BufferType::Add, startInAdd, textLength, line_count } );
+        pieces_.push_back( { BufferType::Add, startInAdd, textLength } );
     } else {
         auto res = findPieceAt( position );
         if( res.offsetInPiece_ > 0 ) {
@@ -192,8 +203,9 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
             res.pieceIndex_++;
         }
         pieces_.insert( pieces_.begin() + static_cast<std::ptrdiff_t>( res.pieceIndex_ ),
-                        { BufferType::Add, startInAdd, textLength, line_count } );
+                        { BufferType::Add, startInAdd, textLength } );
     }
+    rebuildOffsetIndex();
 }
 
 auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
@@ -223,6 +235,7 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
         removedSoFar += iter->length_;
         iter = pieces_.erase( iter );
     }
+    rebuildOffsetIndex();
 }
 
 auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
@@ -275,8 +288,21 @@ auto PieceTable::computeLPS( const std::string& pattern ) -> std::vector<int>
 auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool matchWord ) const
     -> std::vector<uint64_t>
 {
+    static const std::atomic<bool> never{ false };
+    return findAllImpl(
+        pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+}
+
+auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
+                              const std::function<void( uint64_t, uint64_t )>& progress,
+                              const std::atomic<bool>& cancel ) const -> std::vector<uint64_t>
+{
+    // Poll progress/cancel roughly every 1 MiB of scanned bytes.
+    static constexpr uint64_t kScanProgressMask = ( 1ULL << 20 ) - 1;
+
     std::vector<uint64_t> results;
-    if( pattern.empty() || size() == 0 ) {
+    const uint64_t totalBytes = size();
+    if( pattern.empty() || totalBytes == 0 ) {
         return results;
     }
 
@@ -299,6 +325,13 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
         }
 
         for( uint64_t idx = 0; idx < piece.length_; ++idx ) {
+            if( ( logical_pos & kScanProgressMask ) == 0 ) {
+                if( cancel.load( std::memory_order_relaxed ) ) {
+                    return {};
+                }
+                progress( logical_pos, totalBytes );
+            }
+
             char currentChar = bufferPtr[piece.start_ + idx];
             char compareChar = matchCase ? currentChar
                                          : static_cast<char>( std::tolower(
@@ -320,7 +353,7 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
                     if( std::isalnum( static_cast<unsigned char>( before ) ) != 0 ) {
                         keepResult = false;
                     }
-                    if( keepResult && ( foundPos + matchIdx < size() ) ) {
+                    if( keepResult && ( foundPos + matchIdx < totalBytes ) ) {
                         char after = getSubstr( foundPos + matchIdx, 1 )[0];
                         if( std::isalnum( static_cast<unsigned char>( after ) ) != 0 ) {
                             keepResult = false;
@@ -331,7 +364,10 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
                 if( keepResult ) {
                     results.push_back( foundPos );
                 }
-                matchIdx = lps[matchIdx - 1];
+                // Non-overlapping semantics: resume scanning after the consumed match
+                // (both accepted and word-boundary-rejected terminal branches reset to 0)
+                // so successive matches are always at least patternLen apart.
+                matchIdx = 0;
             }
             logical_pos++;
         }
@@ -342,25 +378,94 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
 auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement,
                              bool matchCase, bool matchWord ) -> uint64_t
 {
+    static const std::atomic<bool> never{ false };
+    return replaceAll(
+        pattern, replacement, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+}
+
+auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement,
+                             bool matchCase, bool matchWord,
+                             const std::function<void( uint64_t, uint64_t )>& progress,
+                             const std::atomic<bool>& cancel ) -> uint64_t
+{
+    static constexpr uint64_t kProgressStride = 4096;
+
     if( pattern.empty() ) {
         return 0;
     }
-    std::vector<uint64_t> occurrences = findAll( pattern, matchCase, matchWord );
-    if( occurrences.empty() ) {
+
+    // The whole operation is two byte-sized passes (scan + merge); report progress over
+    // 2 * totalBytes so the bar climbs monotonically 0->100% across both phases.
+    const uint64_t totalBytes = size();
+    const uint64_t progressSpan = 2 * totalBytes;
+    auto scanProgress = [&progress, progressSpan]( uint64_t bytesScanned, uint64_t /*total*/ ) {
+        progress( bytesScanned, progressSpan );
+    };
+    std::vector<uint64_t> occurrences =
+        findAllImpl( pattern, matchCase, matchWord, scanProgress, cancel );
+    if( occurrences.empty() ) {  // no matches, or canceled mid-scan (nothing mutated yet)
         return 0;
     }
 
-    saveState();
-    isBatchOperation_ = true;
-    uint64_t patternLen = pattern.length();
+    const uint64_t patternLen = pattern.length();
+    const uint64_t replLen = replacement.length();
+    const uint64_t savedAddSize = addBuffer_.size();
+    bool replAppended = false;
 
-    for( auto iter = occurrences.rbegin(); iter != occurrences.rend(); ++iter ) {
-        uint64_t pos = *iter;
-        remove( pos, patternLen );
-        insert( pos, replacement );
+    std::vector<Piece> newPieces;
+    newPieces.reserve( pieces_.size() + 2 * occurrences.size() );
+
+    // Forward-only cursor over the old pieces_ (occurrences are ascending and
+    // non-overlapping, so the cursor is never rewound).
+    size_t srcIdx = 0;
+    uint64_t srcOff = 0;
+    uint64_t cursor = 0;
+    auto advance = [&]( uint64_t target, bool emit ) {
+        while( cursor < target && srcIdx < pieces_.size() ) {
+            const Piece& piece = pieces_[srcIdx];
+            const uint64_t take = std::min( target - cursor, piece.length_ - srcOff );
+            if( emit && take > 0 ) {
+                newPieces.push_back( { piece.type_, piece.start_ + srcOff, take } );
+            }
+            srcOff += take;
+            cursor += take;
+            if( srcOff == piece.length_ ) {
+                ++srcIdx;
+                srcOff = 0;
+            }
+        }
+    };
+
+    const uint64_t matchCount = occurrences.size();
+    uint64_t done = 0;
+
+    for( uint64_t occ : occurrences ) {
+        if( cancel.load( std::memory_order_relaxed ) ) {
+            addBuffer_.resize( savedAddSize );
+            return 0;
+        }
+        advance( occ, true );  // copy the gap [cursor, occ)
+        if( replLen > 0 ) {
+            if( !replAppended ) {
+                addBuffer_.append( replacement );
+                replAppended = true;
+            }
+            newPieces.push_back( { BufferType::Add, savedAddSize, replLen } );
+        }
+        advance( occ + patternLen, false );  // skip the matched source bytes
+        if( ( ++done % kProgressStride ) == 0 ) {
+            // Merge occupies the second half of the bar; also refreshes the cancel bridge.
+            progress( totalBytes + cursor, progressSpan );
+        }
     }
-    isBatchOperation_ = false;
-    return static_cast<uint64_t>( occurrences.size() );
+    advance( totalBytes, true );  // copy the tail (pieces_ not yet mutated, so size == totalBytes)
+
+    saveState();
+    pieces_ = std::move( newPieces );
+    coalescePieces();  // single defrag pass before the main thread repaints
+    rebuildOffsetIndex();
+    progress( progressSpan, progressSpan );
+    return matchCount;
 }
 
 auto PieceTable::replaceFirst( const std::string& pattern, const std::string& replacement,
@@ -386,6 +491,20 @@ void PieceTable::saveState()
     if( undoStack_.size() > kMaxUndoHistory ) {
         undoStack_.erase( undoStack_.begin() );
     }
+
+    // Memory guard: snapshots are full copies of pieces_, which can hold millions of entries
+    // after a large replaceAll. Cap total undo memory by evicting oldest snapshots (keeping at
+    // least the most recent) so editing a heavily fragmented document cannot exhaust RAM.
+    uint64_t undoBytes = std::accumulate(
+        undoStack_.begin(), undoStack_.end(), 0ULL,
+        []( uint64_t acc, const std::vector<Piece>& snapshot ) -> uint64_t {
+            return acc + ( static_cast<uint64_t>( snapshot.size() ) * sizeof( Piece ) );
+        } );
+
+    while( undoStack_.size() > 1 && undoBytes > kMaxUndoBytes ) {
+        undoBytes -= static_cast<uint64_t>( undoStack_.front().size() ) * sizeof( Piece );
+        undoStack_.erase( undoStack_.begin() );
+    }
 }
 
 auto PieceTable::undo() -> bool
@@ -396,6 +515,7 @@ auto PieceTable::undo() -> bool
     redoStack_.push_back( pieces_ );
     pieces_ = undoStack_.back();
     undoStack_.pop_back();
+    rebuildOffsetIndex();
     return true;
 }
 
@@ -407,6 +527,7 @@ auto PieceTable::redo() -> bool
     undoStack_.push_back( pieces_ );
     pieces_ = redoStack_.back();
     redoStack_.pop_back();
+    rebuildOffsetIndex();
     return true;
 }
 
@@ -416,8 +537,8 @@ PieceTable::PieceTable( PieceTable&& other ) noexcept
       fileDescriptor_( other.fileDescriptor_ ),
       addBuffer_( std::move( other.addBuffer_ ) ),
       pieces_( std::move( other.pieces_ ) ),
-      originalNewlines_( std::move( other.originalNewlines_ ) ),
-      addNewlines_( std::move( other.addNewlines_ ) ),
+      pieceStartOffsets_( std::move( other.pieceStartOffsets_ ) ),
+      total_size_( other.total_size_ ),
       isBatchOperation_( other.isBatchOperation_ ),
       lastSavedUndoSize_( other.lastSavedUndoSize_ ),
       undoStack_( std::move( other.undoStack_ ) ),
@@ -426,6 +547,8 @@ PieceTable::PieceTable( PieceTable&& other ) noexcept
     other.originalBuffer_ = nullptr;
     other.fileDescriptor_ = -1;
     other.mmapSize_ = 0;
+    other.total_size_ = 0;
+    other.pieceStartOffsets_.assign( 1, 0 );
 }
 
 auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
@@ -437,8 +560,8 @@ auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
         fileDescriptor_ = other.fileDescriptor_;
         addBuffer_ = std::move( other.addBuffer_ );
         pieces_ = std::move( other.pieces_ );
-        originalNewlines_ = std::move( other.originalNewlines_ );
-        addNewlines_ = std::move( other.addNewlines_ );
+        pieceStartOffsets_ = std::move( other.pieceStartOffsets_ );
+        total_size_ = other.total_size_;
         isBatchOperation_ = other.isBatchOperation_;
         lastSavedUndoSize_ = other.lastSavedUndoSize_;
         undoStack_ = std::move( other.undoStack_ );
@@ -447,66 +570,10 @@ auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
         other.originalBuffer_ = nullptr;
         other.fileDescriptor_ = -1;
         other.mmapSize_ = 0;
+        other.total_size_ = 0;
+        other.pieceStartOffsets_.assign( 1, 0 );
     }
     return *this;
-}
-
-auto PieceTable::getLineCount() const -> int
-{
-    return std::accumulate( pieces_.begin(), pieces_.end(), 1, []( int acc, const Piece& piece ) {
-        return acc + static_cast<int>( piece.line_count_ );
-    } );
-}
-
-auto PieceTable::getLineStart( int line ) const -> uint64_t
-{
-    if( line <= 0 ) {
-        return 0;
-    }
-
-    uint64_t current_pos = 0;
-    int current_line = 0;
-
-    for( const auto& piece : pieces_ ) {
-        if( current_line + static_cast<int>( piece.line_count_ ) >= line ) {
-            int newline_index = line - current_line - 1;
-            const auto& newlines =
-                ( piece.type_ == BufferType::Original ) ? originalNewlines_ : addNewlines_;
-            auto iter = std::lower_bound( newlines.begin(), newlines.end(), piece.start_ );
-
-            uint64_t absolute_pos = *( iter + newline_index );
-            uint64_t offset_in_piece = absolute_pos - piece.start_;
-            return current_pos + offset_in_piece + 1;
-        }
-        current_line += static_cast<int>( piece.line_count_ );
-        current_pos += piece.length_;
-    }
-    return size();
-}
-
-auto PieceTable::getLineFromPosition( uint64_t position ) const -> int
-{
-    if( position >= size() ) {
-        return getLineCount() - 1;
-    }
-
-    uint64_t current_pos = 0;
-    int current_line = 0;
-
-    for( const auto& piece : pieces_ ) {
-        if( position < current_pos + piece.length_ ) {
-            uint64_t offset_in_piece = position - current_pos;
-            const auto& newlines =
-                ( piece.type_ == BufferType::Original ) ? originalNewlines_ : addNewlines_;
-
-            auto iter1 = std::lower_bound( newlines.begin(), newlines.end(), piece.start_ );
-            auto iter2 = std::upper_bound( iter1, newlines.end(), piece.start_ + offset_in_piece );
-            return current_line + static_cast<int>( std::distance( iter1, iter2 ) );
-        }
-        current_line += static_cast<int>( piece.line_count_ );
-        current_pos += piece.length_;
-    }
-    return current_line;
 }
 
 auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
@@ -526,7 +593,7 @@ auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
         uint64_t availableInPiece = piece.length_ - offset;
         uint64_t toTake = std::min( remaining, availableInPiece );
 
-        fragments.push_back( { piece.type_, piece.start_ + offset, toTake, 0 } );
+        fragments.push_back( { piece.type_, piece.start_ + offset, toTake } );
 
         remaining -= toTake;
         offset = 0;

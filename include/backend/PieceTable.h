@@ -6,7 +6,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -30,7 +32,6 @@ public:
         BufferType type_;
         uint64_t start_;
         uint64_t length_;
-        uint32_t line_count_;
     };
 
     /**
@@ -76,6 +77,26 @@ public:
      */
     auto replaceAll( const std::string& pattern, const std::string& replacement,
                      bool matchCase = true, bool matchWord = false ) -> uint64_t;
+
+    /**
+     * @brief Replaces all occurrences with progress reporting and cancellation.
+     *
+     * Single-pass, transactional rebuild: the document is never mutated until the
+     * operation completes. If @p cancel becomes true (or an exception occurs) the
+     * PieceTable is left exactly as it was before the call (rollback) and 0 is returned.
+     *
+     * @param pattern The string to search for.
+     * @param replacement The string to substitute.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @param progress Callback invoked periodically with (done, total) match counts.
+     * @param cancel Polled cooperatively; when true the operation aborts and rolls back.
+     * @return Number of replacements made, or 0 if none / canceled.
+     */
+    auto replaceAll( const std::string& pattern, const std::string& replacement, bool matchCase,
+                     bool matchWord,
+                     const std::function<void( uint64_t done, uint64_t total )>& progress,
+                     const std::atomic<bool>& cancel ) -> uint64_t;
 
     /**
      * @brief Retrieves the total logical size of the text.
@@ -180,24 +201,31 @@ public:
      * @brief Calculates the total number of lines in the document.
      * @return Line count.
      */
-    [[nodiscard]] auto getLineCount() const -> int;
+    // [[nodiscard]] auto getLineCount() const -> int;
 
     /**
      * @brief Finds the starting byte position of a given line.
      * @param line Zero-based line index.
      * @return Logical byte position.
      */
-    [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
+    // [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
 
     /**
      * @brief Determines the line number for a specific byte position.
      * @param position Logical byte position.
      * @return Zero-based line index.
      */
-    [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
+    // [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
 
 private:
     [[nodiscard]] static auto computeLPS( const std::string& pattern ) -> std::vector<int>;
+
+    // Shared KMP scan backing findAll/replaceAll. Reports byte-based progress and
+    // aborts (returns the matches found so far is NOT done — returns empty) when cancel is set.
+    [[nodiscard]] auto findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
+                                    const std::function<void( uint64_t, uint64_t )>& progress,
+                                    const std::atomic<bool>& cancel ) const
+        -> std::vector<uint64_t>;
 
     std::vector<std::vector<Piece>> undoStack_;
     std::vector<std::vector<Piece>> redoStack_;
@@ -212,6 +240,15 @@ private:
     [[nodiscard]] auto findPieceAt( uint64_t position ) const -> FindResult;
     auto splitPiece( size_t pieceIndex, uint64_t offset ) -> void;
 
+    // Rebuilds pieceStartOffsets_ (prefix sums of piece lengths) in one O(pieces) pass and
+    // sets total_size_ = pieceStartOffsets_.back(). Single source of truth for size + offsets;
+    // must be called after every structural change to pieces_.
+    auto rebuildOffsetIndex() -> void;
+
+    // Merges adjacent pieces that reference contiguous spans of the same buffer, shrinking
+    // pieces_ after a fragmenting batch operation (length-preserving; total_size_ untouched).
+    auto coalescePieces() -> void;
+
     auto openMmap( const std::string& filePath ) -> void;
     auto closeMmap() -> void;
 
@@ -222,8 +259,12 @@ private:
     std::string addBuffer_;
     std::vector<Piece> pieces_;
 
-    std::vector<uint64_t> originalNewlines_;
-    std::vector<uint64_t> addNewlines_;
+    // Prefix sums of piece lengths: pieceStartOffsets_[i] is the logical start of pieces_[i],
+    // size() == pieceStartOffsets_.size() - 1, and pieceStartOffsets_.back() == total_size_.
+    // Enables O(log n) findPieceAt via binary search.
+    std::vector<uint64_t> pieceStartOffsets_{ 0 };
+
+    uint64_t total_size_{ 0 };  // cached sum of piece lengths; size() returns this in O(1)
 
     bool isBatchOperation_{ false };
     uint64_t lastSavedUndoSize_{ 0 };

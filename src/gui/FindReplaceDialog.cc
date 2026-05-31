@@ -1,9 +1,12 @@
 #include "gui/FindReplaceDialog.h"
 
 #include <QHBoxLayout>
+#include <QHideEvent>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <QWindow>
 
 FindReplaceDialog::FindReplaceDialog( QWidget* parent ) : QDialog( parent )
 {
@@ -35,6 +38,22 @@ auto FindReplaceDialog::showReplace() -> void
     show();
     raise();
     activateWindow();
+}
+
+auto FindReplaceDialog::hideEvent( QHideEvent* event ) -> void
+{
+    QDialog::hideEvent( event );
+    emit dialogClosed();
+}
+
+auto FindReplaceDialog::mousePressEvent( QMouseEvent* event ) -> void
+{
+    if( event->button() == Qt::LeftButton ) {
+        if( windowHandle() != nullptr ) {
+            windowHandle()->startSystemMove();
+        }
+        event->accept();
+    }
 }
 
 auto FindReplaceDialog::setupUi() -> void
