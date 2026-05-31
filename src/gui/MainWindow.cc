@@ -80,8 +80,7 @@ auto MainWindow::closeEvent( QCloseEvent* event ) -> void
             QMessageBox::Warning, "Unsaved Changes",
             "The document has been modified. Do you want to save your changes before closing?",
             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this );
-        msgBox.setWindowFlags( msgBox.windowFlags() & ~Qt::WindowCloseButtonHint &
-                               ~Qt::WindowMinimizeButtonHint & ~Qt::WindowMaximizeButtonHint );
+        msgBox.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
 
         int reply = msgBox.exec();
 
