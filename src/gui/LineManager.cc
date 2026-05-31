@@ -22,8 +22,9 @@ void LineManager::reset()
 void LineManager::invalidateCacheFromOffset( uint64_t offset )
 {
     std::lock_guard<std::mutex> lock( cache_mutex_ );
-    if( line_start_offsets_.empty() )
+    if( line_start_offsets_.empty() ) {
         return;
+    }
 
     auto it = std::upper_bound( line_start_offsets_.begin(), line_start_offsets_.end(), offset );
     if( it != line_start_offsets_.begin() ) {
@@ -91,8 +92,9 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
             uint64_t new_len = current_offset - line_start_offsets_.back();
             if( new_len > 0 ) {
                 std::string last_char = pt_->getSubstr( current_offset - 1, 1 );
-                if( last_char == "\n" )
+                if( last_char == "\n" ) {
                     new_len -= 1;
+                }
             }
             if( new_len > global_max_line_length_ ) {
                 global_max_line_length_ = new_len;
@@ -104,8 +106,9 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
 
 void LineManager::ensureLineCalculated( int target_line )
 {
-    if( target_line < 0 )
+    if( target_line < 0 ) {
         return;
+    }
 
     while( true ) {
         {
@@ -130,10 +133,11 @@ void LineManager::ensureLineCalculated( int target_line )
     }
 }
 
-uint64_t LineManager::getLineOffset( int virtual_line )
+auto LineManager::getLineOffset( int virtual_line ) -> uint64_t
 {
-    if( virtual_line < 0 )
+    if( virtual_line < 0 ) {
         return 0;
+    }
     ensureLineCalculated( virtual_line );
 
     std::lock_guard<std::mutex> lock( cache_mutex_ );
@@ -143,7 +147,7 @@ uint64_t LineManager::getLineOffset( int virtual_line )
     return line_start_offsets_.back();  // Return last known if out of bounds
 }
 
-int LineManager::getVirtualLineFromOffset( uint64_t offset )
+auto LineManager::getVirtualLineFromOffset( uint64_t offset ) -> int
 {
     ensureOffsetCalculated( offset );
 
@@ -155,13 +159,14 @@ int LineManager::getVirtualLineFromOffset( uint64_t offset )
     return static_cast<int>( std::distance( line_start_offsets_.begin(), it ) );
 }
 
-int LineManager::getLineCount()
+auto LineManager::getLineCount() -> int
 {
     uint64_t file_size = pt_->size();
 
     std::lock_guard<std::mutex> lock( cache_mutex_ );
-    if( line_start_offsets_.empty() )
+    if( line_start_offsets_.empty() ) {
         return 1;
+    }
     if( line_start_offsets_.back() >= file_size ) {
         return static_cast<int>( line_start_offsets_.size() );
     }
@@ -181,7 +186,7 @@ int LineManager::getLineCount()
     return processed_lines + estimated_remaining;
 }
 
-uint64_t LineManager::getVirtualLineLength( int virtual_line )
+auto LineManager::getVirtualLineLength( int virtual_line ) -> uint64_t
 {
     ensureLineCalculated( virtual_line + 1 );
 
@@ -215,8 +220,8 @@ auto LineManager::getGlobalMaxLineLength() const -> uint64_t
     return global_max_line_length_;
 }
 
-auto LineManager::getLineChunk( int virtual_line, uint64_t start_col,
-                                uint64_t length ) -> std::string
+auto LineManager::getLineChunk( int virtual_line, uint64_t start_col, uint64_t length )
+    -> std::string
 {
     uint64_t line_len = getVirtualLineLength( virtual_line );
     if( start_col >= line_len ) {
@@ -232,9 +237,10 @@ auto LineManager::getLineChunk( int virtual_line, uint64_t start_col,
         int back_offset = 0;
         while( back_offset < 4 && chunk_start >= line_start + back_offset ) {
             std::string b = pt_->getSubstr( chunk_start - back_offset, 1 );
-            if( b.empty() )
+            if( b.empty() ) {
                 break;
-            unsigned char byte = static_cast<unsigned char>( b[0] );
+            }
+            auto byte = static_cast<unsigned char>( b[0] );
             if( ( byte & 0xC0 ) != 0x80 ) {
                 chunk_start -= back_offset;
                 actual_length += back_offset;
@@ -250,16 +256,18 @@ auto LineManager::getLineChunk( int virtual_line, uint64_t start_col,
     if( chunk_start + actual_length < line_start + line_len ) {
         std::string next_b = pt_->getSubstr( chunk_start + actual_length, 1 );
         if( !next_b.empty() ) {
-            unsigned char byte = static_cast<unsigned char>( next_b[0] );
+            auto byte = static_cast<unsigned char>( next_b[0] );
             if( ( byte & 0xC0 ) == 0x80 ) {
                 int extra = 0;
                 while( extra < 4 && chunk_start + actual_length + extra < line_start + line_len ) {
                     std::string b = pt_->getSubstr( chunk_start + actual_length + extra, 1 );
-                    if( b.empty() )
+                    if( b.empty() ) {
                         break;
-                    unsigned char check_byte = static_cast<unsigned char>( b[0] );
-                    if( ( check_byte & 0xC0 ) != 0x80 )
+                    }
+                    auto check_byte = static_cast<unsigned char>( b[0] );
+                    if( ( check_byte & 0xC0 ) != 0x80 ) {
                         break;
+                    }
                     extra++;
                 }
                 chunk += pt_->getSubstr( chunk_start + actual_length, extra );

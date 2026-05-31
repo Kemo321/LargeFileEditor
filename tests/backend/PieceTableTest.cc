@@ -5,6 +5,7 @@
  */
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <cstdio>
 #include <fstream>
 #include <stdexcept>
@@ -394,14 +395,24 @@ TEST_F( PieceTableTest, FindAllSpanningMultipleTinyPieces )
     EXPECT_EQ( results[0], 0 );
 }
 
-TEST_F( PieceTableTest, FindAllOverlappingMatches )
+TEST_F( PieceTableTest, FindAllNonOverlappingMatches )
 {
     PieceTable pieceTable( createTempFile( "ANANA" ) );
 
+    // Non-overlapping semantics: scanning resumes after the consumed match,
+    // so "ANA" matches once at 0 (the candidate at 2 overlaps and is skipped).
     auto results = pieceTable.findAll( "ANA" );
-    ASSERT_EQ( results.size(), 2 );
+    ASSERT_EQ( results.size(), 1 );
     EXPECT_EQ( results[0], 0 );
-    EXPECT_EQ( results[1], 2 );
+}
+
+TEST_F( PieceTableTest, FindAllNonOverlappingRepeatedChar )
+{
+    PieceTable pieceTable( createTempFile( "tttt" ) );
+
+    auto results = pieceTable.findAll( "ttt" );
+    ASSERT_EQ( results.size(), 1 );
+    EXPECT_EQ( results[0], 0 );
 }
 
 TEST_F( PieceTableTest, FindAllComplexLPSBranchCoverage )
@@ -419,10 +430,11 @@ TEST_F( PieceTableTest, FindAllKMPMismatchFallbackInsideSearch )
     PieceTable pieceTable( createTempFile( "AABAACAADAABAABA" ) );
 
     auto results = pieceTable.findAll( "AABA" );
-    ASSERT_EQ( results.size(), 3 );
+    // Non-overlapping: matches at 0 and 9; the candidate at 12 overlaps the
+    // match consumed at 9 (9 + 4 = 13 > 12) and is skipped.
+    ASSERT_EQ( results.size(), 2 );
     EXPECT_EQ( results[0], 0 );
     EXPECT_EQ( results[1], 9 );
-    EXPECT_EQ( results[2], 12 );
 }
 
 TEST_F( PieceTableTest, ReplaceFirstFound )
@@ -520,6 +532,63 @@ TEST_F( PieceTableTest, ReplaceAllMassiveFragmentation )
 
     EXPECT_EQ( count, 5 );
     EXPECT_EQ( pieceTable.getText(), "BB BB BB BB BB " );
+}
+
+TEST_F( PieceTableTest, ReplaceAllNonOverlappingPattern )
+{
+    // Previously overlapping matches ("ttt" at 0 and 1) corrupted replaceAll.
+    // Non-overlapping semantics make this safe: one match, no exception.
+    PieceTable pieceTable( createTempFile( "tttt" ) );
+    uint64_t count = pieceTable.replaceAll( "ttt", "x" );
+
+    EXPECT_EQ( count, 1 );
+    EXPECT_EQ( pieceTable.getText(), "xt" );
+}
+
+TEST_F( PieceTableTest, ReplaceAllReplacementContainsPattern )
+{
+    // Replacement contains the pattern; matches come from one pre-scan of the
+    // old text, so there is no runaway re-scan/growth.
+    PieceTable pieceTable( createTempFile( "aaa" ) );
+    uint64_t count = pieceTable.replaceAll( "a", "aa" );
+
+    EXPECT_EQ( count, 3 );
+    EXPECT_EQ( pieceTable.getText(), "aaaaaa" );
+}
+
+TEST_F( PieceTableTest, ReplaceAllCancelRollsBack )
+{
+    PieceTable pieceTable( createTempFile( "cat dog cat dog" ) );
+    const std::string original = pieceTable.getText();
+
+    std::atomic<bool> cancel{ true };  // canceled before the first iteration
+    uint64_t count = pieceTable.replaceAll(
+        "cat", "X", true, false, []( uint64_t, uint64_t ) {}, cancel );
+
+    EXPECT_EQ( count, 0 );
+    EXPECT_EQ( pieceTable.getText(), original );  // rolled back, unchanged
+    EXPECT_FALSE( pieceTable.canUndo() );         // no state committed
+}
+
+TEST_F( PieceTableTest, ReplaceAllProgressReportsCompletion )
+{
+    PieceTable pieceTable( createTempFile( "a a a a a" ) );
+
+    uint64_t lastDone = 0;
+    uint64_t lastTotal = 0;
+    std::atomic<bool> cancel{ false };
+    uint64_t count = pieceTable.replaceAll(
+        "a", "b", true, false,
+        [&]( uint64_t done, uint64_t total ) {
+            lastDone = done;
+            lastTotal = total;
+        },
+        cancel );
+
+    EXPECT_EQ( count, 5 );
+    EXPECT_EQ( pieceTable.getText(), "b b b b b" );
+    EXPECT_EQ( lastDone, 5 );  // final progress() call reports done == total
+    EXPECT_EQ( lastTotal, 5 );
 }
 
 TEST_F( PieceTableTest, UndoRedoEmptyHistory )

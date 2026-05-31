@@ -13,6 +13,7 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QProgressBar>
+#include <QPushButton>
 #include <QString>
 #include <QtConcurrent/QtConcurrent>
 #include <memory>
@@ -55,6 +56,7 @@ private:
 
     auto onSaveFinished() -> void;
     auto onFindFinished() -> void;
+    auto onReplaceAllFinished() -> void;
 
     auto setFontSizeSmall() -> void;
     auto setFontSizeMedium() -> void;
@@ -65,7 +67,7 @@ private:
     auto createStatusBar() -> void;
     auto updateWindowTitle() -> void;
     auto processFindResults() -> void;
-    auto isBinaryFile( const QString& filePath ) -> bool;
+    static auto isBinaryFile( const QString& filePath ) -> bool;
 
     LargeFileViewer* viewer_;
     FindReplaceDialog* find_replace_dialog_{};
@@ -74,6 +76,7 @@ private:
     QLabel* cursor_pos_label_{};
     QProgressBar* task_progress_bar_{};
     QLabel* task_status_label_{};
+    QPushButton* cancel_task_btn_{};
 
     QAction* open_act_{};
     QAction* save_act_{};
@@ -94,7 +97,11 @@ private:
     std::vector<uint64_t> current_find_results_;
     QString current_find_text_;
     int current_find_index_{ -1 };
+    bool current_match_case_{ true };
+    bool current_match_word_{ false };
+    bool replace_canceled_{ false };
 
     QFutureWatcher<bool>* save_watcher_{};
     QFutureWatcher<std::vector<uint64_t>>* find_watcher_{};
+    QFutureWatcher<uint64_t>* replace_watcher_{};
 };

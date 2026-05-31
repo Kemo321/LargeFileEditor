@@ -6,7 +6,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -75,6 +77,26 @@ public:
      */
     auto replaceAll( const std::string& pattern, const std::string& replacement,
                      bool matchCase = true, bool matchWord = false ) -> uint64_t;
+
+    /**
+     * @brief Replaces all occurrences with progress reporting and cancellation.
+     *
+     * Single-pass, transactional rebuild: the document is never mutated until the
+     * operation completes. If @p cancel becomes true (or an exception occurs) the
+     * PieceTable is left exactly as it was before the call (rollback) and 0 is returned.
+     *
+     * @param pattern The string to search for.
+     * @param replacement The string to substitute.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @param progress Callback invoked periodically with (done, total) match counts.
+     * @param cancel Polled cooperatively; when true the operation aborts and rolls back.
+     * @return Number of replacements made, or 0 if none / canceled.
+     */
+    auto replaceAll( const std::string& pattern, const std::string& replacement, bool matchCase,
+                     bool matchWord,
+                     const std::function<void( uint64_t done, uint64_t total )>& progress,
+                     const std::atomic<bool>& cancel ) -> uint64_t;
 
     /**
      * @brief Retrieves the total logical size of the text.

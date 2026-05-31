@@ -3,10 +3,10 @@
 #include <QHBoxLayout>
 #include <QHideEvent>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <QWindow>
-#include <QMouseEvent>
 
 FindReplaceDialog::FindReplaceDialog( QWidget* parent ) : QDialog( parent )
 {

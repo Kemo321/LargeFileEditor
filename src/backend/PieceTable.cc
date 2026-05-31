@@ -308,7 +308,10 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
                 if( keepResult ) {
                     results.push_back( foundPos );
                 }
-                matchIdx = lps[matchIdx - 1];
+                // Non-overlapping semantics: resume scanning after the consumed match
+                // (both accepted and word-boundary-rejected terminal branches reset to 0)
+                // so successive matches are always at least patternLen apart.
+                matchIdx = 0;
             }
             logical_pos++;
         }
@@ -319,6 +322,18 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
 auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement,
                              bool matchCase, bool matchWord ) -> uint64_t
 {
+    static const std::atomic<bool> never{ false };
+    return replaceAll(
+        pattern, replacement, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+}
+
+auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement,
+                             bool matchCase, bool matchWord,
+                             const std::function<void( uint64_t, uint64_t )>& progress,
+                             const std::atomic<bool>& cancel ) -> uint64_t
+{
+    static constexpr uint64_t kProgressStride = 4096;
+
     if( pattern.empty() ) {
         return 0;
     }
@@ -327,17 +342,62 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
         return 0;
     }
 
-    saveState();
-    isBatchOperation_ = true;
-    uint64_t patternLen = pattern.length();
+    const uint64_t patternLen = pattern.length();
+    const uint64_t replLen = replacement.length();
+    const uint64_t savedAddSize = addBuffer_.size();
+    bool replAppended = false;
 
-    for( auto iter = occurrences.rbegin(); iter != occurrences.rend(); ++iter ) {
-        uint64_t pos = *iter;
-        remove( pos, patternLen );
-        insert( pos, replacement );
+    std::vector<Piece> newPieces;
+    newPieces.reserve( pieces_.size() + 2 * occurrences.size() );
+
+    // Forward-only cursor over the old pieces_ (occurrences are ascending and
+    // non-overlapping, so the cursor is never rewound).
+    size_t srcIdx = 0;
+    uint64_t srcOff = 0;
+    uint64_t cursor = 0;
+    auto advance = [&]( uint64_t target, bool emit ) {
+        while( cursor < target && srcIdx < pieces_.size() ) {
+            const Piece& piece = pieces_[srcIdx];
+            const uint64_t take = std::min( target - cursor, piece.length_ - srcOff );
+            if( emit && take > 0 ) {
+                newPieces.push_back( { piece.type_, piece.start_ + srcOff, take } );
+            }
+            srcOff += take;
+            cursor += take;
+            if( srcOff == piece.length_ ) {
+                ++srcIdx;
+                srcOff = 0;
+            }
+        }
+    };
+
+    const uint64_t total = occurrences.size();
+    uint64_t done = 0;
+
+    for( uint64_t occ : occurrences ) {
+        if( cancel.load( std::memory_order_relaxed ) ) {
+            addBuffer_.resize( savedAddSize );
+            return 0;
+        }
+        advance( occ, true );  // copy the gap [cursor, occ)
+        if( replLen > 0 ) {
+            if( !replAppended ) {
+                addBuffer_.append( replacement );
+                replAppended = true;
+            }
+            newPieces.push_back( { BufferType::Add, savedAddSize, replLen } );
+        }
+        advance( occ + patternLen, false );  // skip the matched source bytes
+        if( ( ++done % kProgressStride ) == 0 ) {
+            progress( done, total );
+        }
     }
-    isBatchOperation_ = false;
-    return static_cast<uint64_t>( occurrences.size() );
+    advance( size(), true );  // copy the tail
+
+    saveState();
+    pieces_ = std::move( newPieces );
+    progress( total, total );
+    return total;
 }
 
 auto PieceTable::replaceFirst( const std::string& pattern, const std::string& replacement,

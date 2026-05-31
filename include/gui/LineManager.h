@@ -20,19 +20,19 @@ public:
      * @brief Gets the global offset for the start of the given virtual line.
      * Calculates lazily if the line hasn't been mapped yet.
      */
-    uint64_t getLineOffset( int virtual_line );
+    auto getLineOffset( int virtual_line ) -> uint64_t;
 
     /**
      * @brief Gets the virtual line number that contains the given global offset.
      * Calculates lazily if the offset hasn't been mapped yet.
      */
-    int getVirtualLineFromOffset( uint64_t offset );
+    auto getVirtualLineFromOffset( uint64_t offset ) -> int;
 
     /**
      * @brief Gets the estimated total number of virtual lines.
-     * For uncalculated portions, it estimates based on average line length.
+     * For uncalculated portions, it estimates based on average line lengauto
      */
-    int getLineCount();
+    auto getLineCount() -> int;
 
     /**
      * @brief Invalidates the cache from a specific global offset downwards.
@@ -45,9 +45,9 @@ public:
     void reset();
 
     /**
-     * @brief Helper to get the length of a virtual line in bytes.
+     * @brief Helper to get the length of a virtual linautoes.
      */
-    uint64_t getVirtualLineLength( int virtual_line );
+    auto getVirtualLineLength( int virtual_line ) -> uint64_t;
 
     /**
      * @brief Gets the maximum line length encountered so far.
@@ -57,8 +57,8 @@ public:
     /**
      * @brief Gets a chunk of a line, ensuring UTF-8 boundaries.
      */
-    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col,
-                                     uint64_t length ) -> std::string;
+    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col, uint64_t length )
+        -> std::string;
 
 private:
     void ensureLineCalculated( int target_line );

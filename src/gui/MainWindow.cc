@@ -7,9 +7,12 @@
 #include <QFileInfo>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPromise>
 #include <QScrollBar>
 #include <QStatusBar>
 #include <QTimer>
+#include <atomic>
+#include <string>
 
 static constexpr int kDefaultWindowWidth = 800;
 static constexpr int kDefaultWindowHeight = 600;
@@ -36,9 +39,15 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     connect( find_replace_dialog_, &FindReplaceDialog::replaceAllRequested, this,
              &MainWindow::onReplaceAllRequested );
     connect( find_replace_dialog_, &FindReplaceDialog::dialogClosed, this, [this]() {
+        if( ( replace_watcher_ != nullptr ) && replace_watcher_->isRunning() ) {
+            replace_canceled_ = true;
+            replace_watcher_->future().cancel();
+        }
         current_find_results_.clear();
         current_find_index_ = -1;
         current_find_text_ = "";
+        current_match_case_ = true;
+        current_match_word_ = false;
         viewer_->setSearchHighlights( {}, -1, 0 );
         task_status_label_->setText( "Ready" );
     } );
@@ -54,6 +63,20 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     connect( find_watcher_, &QFutureWatcher<std::vector<uint64_t>>::finished, this,
              &MainWindow::onFindFinished );
 
+    replace_watcher_ = new QFutureWatcher<uint64_t>( this );
+    connect( replace_watcher_, &QFutureWatcher<uint64_t>::progressValueChanged, task_progress_bar_,
+             &QProgressBar::setValue );
+    connect( replace_watcher_, &QFutureWatcher<uint64_t>::finished, this,
+             &MainWindow::onReplaceAllFinished );
+
+    connect( cancel_task_btn_, &QPushButton::clicked, this, [this]() {
+        if( ( replace_watcher_ != nullptr ) && replace_watcher_->isRunning() ) {
+            replace_canceled_ = true;
+            replace_watcher_->future().cancel();
+            task_status_label_->setText( "Canceling..." );
+        }
+    } );
+
     connect( viewer_, &LargeFileViewer::cursorPositionChanged, this, [this]( int line, int col ) {
         cursor_pos_label_->setText( QString( "Line %1, Col %2" ).arg( line + 1 ).arg( col + 1 ) );
     } );
@@ -68,6 +91,10 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
 
 MainWindow::~MainWindow()
 {
+    if( ( replace_watcher_ != nullptr ) && replace_watcher_->isRunning() ) {
+        replace_watcher_->future().cancel();
+        replace_watcher_->waitForFinished();
+    }
     if( ( save_watcher_ != nullptr ) && save_watcher_->isRunning() ) {
         save_watcher_->waitForFinished();
     }
@@ -80,7 +107,7 @@ auto MainWindow::closeEvent( QCloseEvent* event ) -> void
             QMessageBox::Warning, "Unsaved Changes",
             "The document has been modified. Do you want to save your changes before closing?",
             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this );
-        msgBox.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+        msgBox.setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint );
 
         int reply = msgBox.exec();
 
@@ -176,10 +203,14 @@ auto MainWindow::createStatusBar() -> void
     task_progress_bar_->setMaximumHeight( kProgressBarHeight );
     task_progress_bar_->hide();
 
+    cancel_task_btn_ = new QPushButton( "Cancel", this );
+    cancel_task_btn_->hide();
+
     task_status_label_ = new QLabel( "Ready", this );
 
     statusBar()->addWidget( task_status_label_ );
     statusBar()->addWidget( task_progress_bar_ );
+    statusBar()->addWidget( cancel_task_btn_ );
 
     cursor_pos_label_ = new QLabel( "Line 1, Col 1", this );
     statusBar()->addPermanentWidget( cursor_pos_label_ );
@@ -216,6 +247,9 @@ auto MainWindow::setFontSizeLarge() -> void
 
 auto MainWindow::openFile() -> void
 {
+    if( ( replace_watcher_ != nullptr ) && replace_watcher_->isRunning() ) {
+        return;
+    }
     QString fileName = QFileDialog::getOpenFileName( this, "Open File", "", "All Files (*)" );
     if( !fileName.isEmpty() ) {
         task_status_label_->setText( "Opening file..." );
@@ -225,11 +259,14 @@ auto MainWindow::openFile() -> void
         if( isBinaryFile( fileName ) ) {
             task_progress_bar_->hide();
             task_status_label_->setText( "Unsupported file type: Binary" );
-            QMessageBox::warning( this, "Unsupported File", "Unsupported file type: Binary files are not supported." );
+            QMessageBox::warning( this, "Unsupported File",
+                                  "Unsupported file type: Binary files are not supported." );
             current_filename_ = "";
             current_find_text_ = "";
             current_find_index_ = -1;
             current_find_results_.clear();
+            current_match_case_ = true;
+            current_match_word_ = false;
             piece_table_ = nullptr;
             viewer_->setPieceTable( nullptr );
             viewer_->setEnabled( false );
@@ -242,6 +279,8 @@ auto MainWindow::openFile() -> void
         current_find_text_ = "";
         current_find_index_ = -1;
         current_find_results_.clear();
+        current_match_case_ = true;
+        current_match_word_ = false;
 
         try {
             piece_table_ = std::make_unique<PieceTable>( fileName.toStdString() );
@@ -277,8 +316,8 @@ auto MainWindow::isBinaryFile( const QString& filePath ) -> bool
     int nullBytes = 0;
     int controlCount = 0;
 
-    for( int i = 0; i < chunk.size(); ++i ) {
-        unsigned char uc = static_cast<unsigned char>( chunk.at( i ) );
+    for( char i : chunk ) {
+        auto uc = static_cast<unsigned char>( i );
         if( uc == '\0' ) {
             nullBytes++;
         } else if( uc < 32 ) {
@@ -297,7 +336,7 @@ auto MainWindow::isBinaryFile( const QString& filePath ) -> bool
     int invalidUtf8Count = 0;
     int i = 0;
     while( i < chunk.size() ) {
-        unsigned char b1 = static_cast<unsigned char>( chunk.at( i ) );
+        auto b1 = static_cast<unsigned char>( chunk.at( i ) );
         if( b1 < 128 ) {
             i++;
             continue;
@@ -322,7 +361,7 @@ auto MainWindow::isBinaryFile( const QString& filePath ) -> bool
 
         bool valid_seq = true;
         for( int j = 1; j < seq_len; ++j ) {
-            unsigned char bj = static_cast<unsigned char>( chunk.at( i + j ) );
+            auto bj = static_cast<unsigned char>( chunk.at( i + j ) );
             if( ( bj & 0xC0 ) != 0x80 ) {
                 valid_seq = false;
                 break;
@@ -338,11 +377,7 @@ auto MainWindow::isBinaryFile( const QString& filePath ) -> bool
     }
 
     double nonTextRatio = static_cast<double>( controlCount + invalidUtf8Count ) / chunk.size();
-    if( nonTextRatio > 0.15 ) {
-        return true;
-    }
-
-    return false;
+    return nonTextRatio > 0.15;
 }
 
 auto MainWindow::saveFile() -> void
@@ -351,7 +386,7 @@ auto MainWindow::saveFile() -> void
         return;
     }
 
-    if( !piece_table_ || save_watcher_->isRunning() ) {
+    if( !piece_table_ || save_watcher_->isRunning() || replace_watcher_->isRunning() ) {
         return;
     }
 
@@ -419,7 +454,7 @@ auto MainWindow::onSaveFinished() -> void
 
 auto MainWindow::saveFileAs() -> void
 {
-    if( !piece_table_ ) {
+    if( !piece_table_ || replace_watcher_->isRunning() ) {
         return;
     }
 
@@ -461,13 +496,11 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
         return;
     }
 
-    static bool lastMatchCase = matchCase;
-    static bool lastMatchWord = matchWord;
-
-    if( text != current_find_text_ || matchCase != lastMatchCase || matchWord != lastMatchWord ) {
+    if( text != current_find_text_ || matchCase != current_match_case_ ||
+        matchWord != current_match_word_ ) {
         current_find_text_ = text;
-        lastMatchCase = matchCase;
-        lastMatchWord = matchWord;
+        current_match_case_ = matchCase;
+        current_match_word_ = matchWord;
 
         task_progress_bar_->show();
         task_progress_bar_->setRange( 0, 0 );
@@ -560,20 +593,70 @@ auto MainWindow::onReplaceNextRequested( const QString& findText, const QString&
 auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& replaceText,
                                         bool matchCase, bool matchWord ) -> void
 {
-    if( !piece_table_ || findText.isEmpty() ) {
+    if( !piece_table_ || findText.isEmpty() || replace_watcher_->isRunning() ) {
         return;
     }
 
-    uint64_t replaced = piece_table_->replaceAll( findText.toStdString(), replaceText.toStdString(),
-                                                  matchCase, matchWord );
+    replace_canceled_ = false;
+    viewer_->setEnabled( false );
+    save_act_->setEnabled( false );
+    open_act_->setEnabled( false );
+
+    task_progress_bar_->show();
+    task_progress_bar_->setRange( 0, 100 );
+    task_progress_bar_->setValue( 0 );
+    cancel_task_btn_->show();
+    task_status_label_->setText( "Replacing..." );
+
+    const std::string pat = findText.toUtf8().toStdString();
+    const std::string repl = replaceText.toUtf8().toStdString();
+    PieceTable* table = piece_table_.get();
+
+    QFuture<uint64_t> future = QtConcurrent::run( [table, pat, repl, matchCase,
+                                                   matchWord]( QPromise<uint64_t>& promise ) {
+        promise.setProgressRange( 0, 100 );
+        std::atomic<bool> cancel{ false };
+        auto progress = [&promise, &cancel]( uint64_t done, uint64_t total ) {
+            if( promise.isCanceled() ) {
+                cancel.store( true );
+            }
+            promise.setProgressValue( total != 0 ? static_cast<int>( done * 100 / total ) : 100 );
+        };
+        promise.addResult( table->replaceAll( pat, repl, matchCase, matchWord, progress, cancel ) );
+    } );
+
+    replace_watcher_->setFuture( future );
+}
+
+auto MainWindow::onReplaceAllFinished() -> void
+{
+    task_progress_bar_->hide();
+    cancel_task_btn_->hide();
+    viewer_->setEnabled( true );
+    save_act_->setEnabled( true );
+    open_act_->setEnabled( true );
+
+    current_find_results_.clear();
+    current_find_index_ = -1;
+    current_find_text_ = "";
+    viewer_->setSearchHighlights( {}, -1, 0 );
+
+    const uint64_t replaced = replace_watcher_->result();
+
+    if( replace_canceled_ ) {
+        task_status_label_->setText( "Replace All canceled" );
+        if( replaced > 0 ) {  // rare: cancel arrived after the commit
+            viewer_->refreshView();
+            setWindowModified( true );
+        }
+        return;
+    }
 
     if( replaced > 0 ) {
-        current_find_results_.clear();
         viewer_->refreshView();
-        current_find_text_ = "";
+        setWindowModified( true );
         task_status_label_->setText(
             QString( "Successfully replaced %1 occurrences" ).arg( replaced ) );
-        setWindowModified( true );
     } else {
         task_status_label_->setText( "Replace All: No matches found" );
         QMessageBox::information( this, "Replace All", "Text not found." );
