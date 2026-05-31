@@ -38,6 +38,7 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     connect( find_replace_dialog_, &FindReplaceDialog::dialogClosed, this, [this]() {
         current_find_results_.clear();
         current_find_index_ = -1;
+        current_find_text_ = "";
         viewer_->setSearchHighlights( {}, -1, 0 );
         task_status_label_->setText( "Ready" );
     } );
