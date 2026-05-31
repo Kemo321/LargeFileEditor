@@ -562,8 +562,8 @@ TEST_F( PieceTableTest, ReplaceAllCancelRollsBack )
     const std::string original = pieceTable.getText();
 
     std::atomic<bool> cancel{ true };  // canceled before the first iteration
-    uint64_t count =
-        pieceTable.replaceAll( "cat", "X", true, false, []( uint64_t, uint64_t ) {}, cancel );
+    uint64_t count = pieceTable.replaceAll(
+        "cat", "X", true, false, []( uint64_t, uint64_t ) {}, cancel );
 
     EXPECT_EQ( count, 0 );
     EXPECT_EQ( pieceTable.getText(), original );  // rolled back, unchanged

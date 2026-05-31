@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <numeric>
 #include <stdexcept>
 #include <utility>
 
@@ -284,11 +285,12 @@ auto PieceTable::computeLPS( const std::string& pattern ) -> std::vector<int>
     return lps;
 }
 
-auto PieceTable::findAll( const std::string& pattern, bool matchCase,
-                          bool matchWord ) const -> std::vector<uint64_t>
+auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool matchWord ) const
+    -> std::vector<uint64_t>
 {
     static const std::atomic<bool> never{ false };
-    return findAllImpl( pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+    return findAllImpl(
+        pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
 }
 
 auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
@@ -493,10 +495,12 @@ void PieceTable::saveState()
     // Memory guard: snapshots are full copies of pieces_, which can hold millions of entries
     // after a large replaceAll. Cap total undo memory by evicting oldest snapshots (keeping at
     // least the most recent) so editing a heavily fragmented document cannot exhaust RAM.
-    uint64_t undoBytes = 0;
-    for( const auto& snapshot : undoStack_ ) {
-        undoBytes += static_cast<uint64_t>( snapshot.size() ) * sizeof( Piece );
-    }
+    uint64_t undoBytes = std::accumulate(
+        undoStack_.begin(), undoStack_.end(), 0ULL,
+        []( uint64_t acc, const std::vector<Piece>& snapshot ) -> uint64_t {
+            return acc + ( static_cast<uint64_t>( snapshot.size() ) * sizeof( Piece ) );
+        } );
+
     while( undoStack_.size() > 1 && undoBytes > kMaxUndoBytes ) {
         undoBytes -= static_cast<uint64_t>( undoStack_.front().size() ) * sizeof( Piece );
         undoStack_.erase( undoStack_.begin() );
@@ -572,8 +576,8 @@ auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
     return *this;
 }
 
-auto PieceTable::getFragmentsInRange( uint64_t position,
-                                      uint64_t length ) const -> std::vector<Piece>
+auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
+    -> std::vector<Piece>
 {
     std::vector<Piece> fragments;
     if( length == 0 || position >= size() ) {

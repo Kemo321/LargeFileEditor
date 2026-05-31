@@ -90,12 +90,12 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
 
         if( current_offset <= file_size && current_offset > line_start_offsets_.back() ) {
             uint64_t new_len = current_offset - line_start_offsets_.back();
-            if( new_len > 0 ) {
-                std::string last_char = pt_->getSubstr( current_offset - 1, 1 );
-                if( last_char == "\n" ) {
-                    new_len -= 1;
-                }
+
+            std::string last_char = pt_->getSubstr( current_offset - 1, 1 );
+            if( last_char == "\n" ) {
+                new_len -= 1;
             }
+
             if( new_len > global_max_line_length_ ) {
                 global_max_line_length_ = new_len;
             }
