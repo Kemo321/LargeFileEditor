@@ -562,8 +562,8 @@ TEST_F( PieceTableTest, ReplaceAllCancelRollsBack )
     const std::string original = pieceTable.getText();
 
     std::atomic<bool> cancel{ true };  // canceled before the first iteration
-    uint64_t count = pieceTable.replaceAll(
-        "cat", "X", true, false, []( uint64_t, uint64_t ) {}, cancel );
+    uint64_t count =
+        pieceTable.replaceAll( "cat", "X", true, false, []( uint64_t, uint64_t ) {}, cancel );
 
     EXPECT_EQ( count, 0 );
     EXPECT_EQ( pieceTable.getText(), original );  // rolled back, unchanged
@@ -729,4 +729,55 @@ TEST_F( PieceTableTest, MoveSemanticsTransferOwnership )
 
     EXPECT_EQ( table2.size(), 8 );
     EXPECT_EQ( table2.getText(), "Move Me!" );
+}
+
+TEST_F( PieceTableTest, CachedSizeStaysConsistentAcrossMutations )
+{
+    // size() is cached (O(1)); it must equal getText().size() after every mutation,
+    // including the snapshot swaps in undo/redo and the transactional replaceAll commit.
+    PieceTable pieceTable( createTempFile( "the cat sat on the mat" ) );
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    pieceTable.insert( 0, "Hello! " );
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    pieceTable.remove( 0, 7 );
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    pieceTable.replaceAll( "the", "a" );  // shorter replacement
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    pieceTable.replaceAll( "at", "atat" );  // longer replacement
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    pieceTable.replaceAll( "atat", "" );  // deleting replacement
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    pieceTable.undo();
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    pieceTable.redo();
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+}
+
+TEST_F( PieceTableTest, ReplaceAllCoalescesFragmentedTable )
+{
+    // Build a fragmented table out of many small inserts, then replaceAll. The defrag
+    // pass must preserve the exact text and the cached size regardless of piece merging.
+    PieceTable pieceTable;
+    for( int idx = 0; idx < 6; idx++ ) {
+        pieceTable.insert( pieceTable.size(), "ab " );
+    }
+    ASSERT_EQ( pieceTable.getText(), "ab ab ab ab ab ab " );
+
+    uint64_t count = pieceTable.replaceAll( "ab", "X" );
+
+    EXPECT_EQ( count, 6 );
+    EXPECT_EQ( pieceTable.getText(), "X X X X X X " );
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
+
+    // Coalescing is length- and content-preserving: undo restores the original exactly.
+    pieceTable.undo();
+    EXPECT_EQ( pieceTable.getText(), "ab ab ab ab ab ab " );
+    EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
 }

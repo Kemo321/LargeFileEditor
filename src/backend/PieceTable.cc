@@ -23,6 +23,7 @@ PieceTable::PieceTable( const std::string& filePath )
     openMmap( filePath );
     if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr && mmapSize_ > 0 ) {
         pieces_.push_back( { BufferType::Original, 0, mmapSize_ } );
+        total_size_ = mmapSize_;
     }
 }
 
@@ -64,9 +65,37 @@ auto PieceTable::closeMmap() -> void
 
 auto PieceTable::size() const -> uint64_t
 {
-    return std::accumulate(
+    return total_size_;
+}
+
+auto PieceTable::recalculateSize() -> void
+{
+    total_size_ = std::accumulate(
         pieces_.begin(), pieces_.end(), 0ULL,
         []( uint64_t acc, const Piece& piece ) -> uint64_t { return acc + piece.length_; } );
+}
+
+auto PieceTable::coalescePieces() -> void
+{
+    if( pieces_.size() < 2 ) {
+        return;
+    }
+    std::vector<Piece> merged;
+    merged.reserve( pieces_.size() );
+    for( const Piece& piece : pieces_ ) {
+        if( piece.length_ == 0 ) {
+            continue;
+        }
+        if( !merged.empty() ) {
+            Piece& back = merged.back();
+            if( back.type_ == piece.type_ && back.start_ + back.length_ == piece.start_ ) {
+                back.length_ += piece.length_;  // contiguous same-buffer run -> extend
+                continue;
+            }
+        }
+        merged.push_back( piece );
+    }
+    pieces_ = std::move( merged );
 }
 
 auto PieceTable::getText() const -> std::string
@@ -171,6 +200,7 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
         pieces_.insert( pieces_.begin() + static_cast<std::ptrdiff_t>( res.pieceIndex_ ),
                         { BufferType::Add, startInAdd, textLength } );
     }
+    total_size_ += textLength;
 }
 
 auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
@@ -200,6 +230,7 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
         removedSoFar += iter->length_;
         iter = pieces_.erase( iter );
     }
+    total_size_ -= length;
 }
 
 auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
@@ -249,12 +280,11 @@ auto PieceTable::computeLPS( const std::string& pattern ) -> std::vector<int>
     return lps;
 }
 
-auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool matchWord ) const
-    -> std::vector<uint64_t>
+auto PieceTable::findAll( const std::string& pattern, bool matchCase,
+                          bool matchWord ) const -> std::vector<uint64_t>
 {
     static const std::atomic<bool> never{ false };
-    return findAllImpl(
-        pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+    return findAllImpl( pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
 }
 
 auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
@@ -384,12 +414,14 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
     size_t srcIdx = 0;
     uint64_t srcOff = 0;
     uint64_t cursor = 0;
+    uint64_t newTotal = 0;
     auto advance = [&]( uint64_t target, bool emit ) {
         while( cursor < target && srcIdx < pieces_.size() ) {
             const Piece& piece = pieces_[srcIdx];
             const uint64_t take = std::min( target - cursor, piece.length_ - srcOff );
             if( emit && take > 0 ) {
                 newPieces.push_back( { piece.type_, piece.start_ + srcOff, take } );
+                newTotal += take;
             }
             srcOff += take;
             cursor += take;
@@ -415,6 +447,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
                 replAppended = true;
             }
             newPieces.push_back( { BufferType::Add, savedAddSize, replLen } );
+            newTotal += replLen;
         }
         advance( occ + patternLen, false );  // skip the matched source bytes
         if( ( ++done % kProgressStride ) == 0 ) {
@@ -426,6 +459,8 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
 
     saveState();
     pieces_ = std::move( newPieces );
+    total_size_ = newTotal;
+    coalescePieces();  // single defrag pass before the main thread repaints
     progress( progressSpan, progressSpan );
     return matchCount;
 }
@@ -463,6 +498,7 @@ auto PieceTable::undo() -> bool
     redoStack_.push_back( pieces_ );
     pieces_ = undoStack_.back();
     undoStack_.pop_back();
+    recalculateSize();
     return true;
 }
 
@@ -474,6 +510,7 @@ auto PieceTable::redo() -> bool
     undoStack_.push_back( pieces_ );
     pieces_ = redoStack_.back();
     redoStack_.pop_back();
+    recalculateSize();
     return true;
 }
 
@@ -483,6 +520,7 @@ PieceTable::PieceTable( PieceTable&& other ) noexcept
       fileDescriptor_( other.fileDescriptor_ ),
       addBuffer_( std::move( other.addBuffer_ ) ),
       pieces_( std::move( other.pieces_ ) ),
+      total_size_( other.total_size_ ),
       isBatchOperation_( other.isBatchOperation_ ),
       lastSavedUndoSize_( other.lastSavedUndoSize_ ),
       undoStack_( std::move( other.undoStack_ ) ),
@@ -491,6 +529,7 @@ PieceTable::PieceTable( PieceTable&& other ) noexcept
     other.originalBuffer_ = nullptr;
     other.fileDescriptor_ = -1;
     other.mmapSize_ = 0;
+    other.total_size_ = 0;
 }
 
 auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
@@ -502,6 +541,7 @@ auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
         fileDescriptor_ = other.fileDescriptor_;
         addBuffer_ = std::move( other.addBuffer_ );
         pieces_ = std::move( other.pieces_ );
+        total_size_ = other.total_size_;
         isBatchOperation_ = other.isBatchOperation_;
         lastSavedUndoSize_ = other.lastSavedUndoSize_;
         undoStack_ = std::move( other.undoStack_ );
@@ -510,12 +550,13 @@ auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
         other.originalBuffer_ = nullptr;
         other.fileDescriptor_ = -1;
         other.mmapSize_ = 0;
+        other.total_size_ = 0;
     }
     return *this;
 }
 
-auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
-    -> std::vector<Piece>
+auto PieceTable::getFragmentsInRange( uint64_t position,
+                                      uint64_t length ) const -> std::vector<Piece>
 {
     std::vector<Piece> fragments;
     if( length == 0 || position >= size() ) {

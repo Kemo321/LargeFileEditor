@@ -134,8 +134,8 @@ public:
      * @param length Length of the range.
      * @return Vector of intersecting pieces.
      */
-    [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const
-        -> std::vector<Piece>;
+    [[nodiscard]] auto getFragmentsInRange( uint64_t position,
+                                            uint64_t length ) const -> std::vector<Piece>;
 
     /**
      * @brief Inserts text at the specified logical position.
@@ -240,6 +240,13 @@ private:
     [[nodiscard]] auto findPieceAt( uint64_t position ) const -> FindResult;
     auto splitPiece( size_t pieceIndex, uint64_t offset ) -> void;
 
+    // Recomputes total_size_ from pieces_ (used after undo/redo swap a whole snapshot).
+    auto recalculateSize() -> void;
+
+    // Merges adjacent pieces that reference contiguous spans of the same buffer, shrinking
+    // pieces_ after a fragmenting batch operation (length-preserving; total_size_ untouched).
+    auto coalescePieces() -> void;
+
     auto openMmap( const std::string& filePath ) -> void;
     auto closeMmap() -> void;
 
@@ -249,6 +256,8 @@ private:
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
+
+    uint64_t total_size_{ 0 };  // cached sum of piece lengths; size() returns this in O(1)
 
     bool isBatchOperation_{ false };
     uint64_t lastSavedUndoSize_{ 0 };
