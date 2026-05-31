@@ -35,6 +35,12 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
              &MainWindow::onReplaceNextRequested );
     connect( find_replace_dialog_, &FindReplaceDialog::replaceAllRequested, this,
              &MainWindow::onReplaceAllRequested );
+    connect( find_replace_dialog_, &FindReplaceDialog::dialogClosed, this, [this]() {
+        current_find_results_.clear();
+        current_find_index_ = -1;
+        viewer_->setSearchHighlights( {}, -1, 0 );
+        task_status_label_->setText( "Ready" );
+    } );
 
     createActions();
     createMenus();
@@ -504,7 +510,8 @@ auto MainWindow::processFindResults() -> void
     }
 
     uint64_t targetPos = current_find_results_[current_find_index_];
-    viewer_->jumpToLogicalPosition( targetPos );
+    int matchByteLen = static_cast<int>( current_find_text_.toUtf8().length() );
+    viewer_->jumpToLogicalPosition( targetPos, matchByteLen );
     viewer_->setSearchHighlights( current_find_results_, current_find_index_,
                                   current_find_text_.length() );
 

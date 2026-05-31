@@ -1,13 +1,15 @@
 #include "gui/LargeFileViewer.h"
 
 #include <QCursor>
+#include <QEvent>
+#include <QFontDatabase>
 #include <QPainter>
 #include <QScrollBar>
 #include <QStyle>
 #include <QToolTip>
 #include <QWheelEvent>
 #include <algorithm>
-#include <QFontDatabase>
+#include <cmath>
 
 static constexpr int kCursorBlinkRateMs = 500;
 static constexpr int kLineOffsetDelayMs = 300;
@@ -15,6 +17,43 @@ static constexpr int kLineHeightPadding = 5;
 static constexpr int kGutterTextPadding = 10;
 static constexpr int kScrollStepDivisor = 120;
 static constexpr int kWheelMultiplier = 3;
+static constexpr int kGutterDigits = 6;
+static constexpr int kOneMillion = 1'000'000;
+static constexpr int kOneBillion = 1'000'000'000;
+
+static auto formatLineNumber( int lineNum ) -> QString
+{
+    if( lineNum < kOneMillion ) {
+        return QString::number( lineNum );
+    }
+    double value;
+    char suffix;
+    if( lineNum < kOneBillion ) {
+        value = static_cast<double>( lineNum ) / kOneMillion;
+        suffix = 'M';
+    } else {
+        value = static_cast<double>( lineNum ) / kOneBillion;
+        suffix = 'B';
+    }
+    int intPart = static_cast<int>( value );
+    int intDigits;
+    if( intPart < 10 ) {
+        intDigits = 1;
+    } else if( intPart < 100 ) {
+        intDigits = 2;
+    } else if( intPart < 1000 ) {
+        intDigits = 3;
+    } else {
+        intDigits = 4;
+    }
+    int decimals = std::max( 0, 4 - intDigits );
+    double factor = 1.0;
+    for( int i = 0; i < decimals; ++i ) {
+        factor *= 10.0;
+    }
+    value = std::floor( value * factor ) / factor;
+    return QString::number( value, 'f', decimals ) + QChar( suffix );
+}
 
 LargeFileViewer::LargeFileViewer( QWidget* parent ) : QAbstractScrollArea( parent )
 {
@@ -93,7 +132,7 @@ auto LargeFileViewer::refreshView() -> void
     viewport()->update();
 }
 
-auto LargeFileViewer::jumpToLogicalPosition( uint64_t pos ) -> void
+auto LargeFileViewer::jumpToLogicalPosition( uint64_t pos, int matchLength ) -> void
 {
     if( piece_table_ == nullptr || !line_manager_ ) {
         return;
@@ -101,6 +140,24 @@ auto LargeFileViewer::jumpToLogicalPosition( uint64_t pos ) -> void
     int line = line_manager_->getVirtualLineFromOffset( pos );
     int col = static_cast<int>( pos - line_manager_->getLineOffset( line ) );
     setCursorPosition( line, col );
+
+    if( matchLength > 0 ) {
+        QFontMetrics fontMetrics( font() );
+        int charWidth = fontMetrics.horizontalAdvance( 'A' );
+        if( charWidth <= 0 ) {
+            charWidth = 1;
+        }
+        int matchStartPx = col * charWidth;
+        int matchEndPx = ( col + matchLength ) * charWidth;
+        int visibleWidth = viewport()->width() - gutter_width_ - kGutterTextPadding;
+        int currentHScroll = horizontalScrollBar()->value();
+
+        if( matchStartPx < currentHScroll || matchEndPx > currentHScroll + visibleWidth ) {
+            int matchCenterPx = ( matchStartPx + matchEndPx ) / 2;
+            int newScroll = std::max( 0, matchCenterPx - visibleWidth / 2 );
+            horizontalScrollBar()->setValue( newScroll );
+        }
+    }
 }
 
 auto LargeFileViewer::blinkCursor() -> void
@@ -146,6 +203,14 @@ auto LargeFileViewer::onScrollbarMoved( int value ) -> void
     }
 }
 
+auto LargeFileViewer::changeEvent( QEvent* event ) -> void
+{
+    QAbstractScrollArea::changeEvent( event );
+    if( event->type() == QEvent::FontChange ) {
+        refreshLineOffsets();
+    }
+}
+
 auto LargeFileViewer::refreshLineOffsets() -> void
 {
     if( piece_table_ == nullptr || !line_manager_ ) {
@@ -155,7 +220,10 @@ auto LargeFileViewer::refreshLineOffsets() -> void
     QFontMetrics fontMetrics( font() );
     int lineHeight = fontMetrics.height() + kLineHeightPadding;
     int charWidth = fontMetrics.horizontalAdvance( 'A' );
-    if (charWidth <= 0) charWidth = 1;
+    if( charWidth <= 0 ) {
+        charWidth = 1;
+    }
+    gutter_width_ = kGutterDigits * charWidth + kGutterTextPadding * 2;
 
     int totalLines = line_manager_->getLineCount();
     int visibleLines = viewport()->height() / lineHeight;
@@ -219,7 +287,9 @@ auto LargeFileViewer::scrollToCursor() -> void
     QFontMetrics fontMetrics( font() );
     int lineHeight = fontMetrics.height() + kLineHeightPadding;
     int charWidth = fontMetrics.horizontalAdvance( 'A' );
-    if (charWidth <= 0) charWidth = 1;
+    if( charWidth <= 0 ) {
+        charWidth = 1;
+    }
 
     int currentScroll = verticalScrollBar()->value();
     int visibleLinesCount = viewport()->height() / lineHeight;
@@ -389,7 +459,9 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
     QFontMetrics fontMetrics( font() );
     int lineHeight = fontMetrics.height() + kLineHeightPadding;
     int charWidth = fontMetrics.horizontalAdvance( 'A' );
-    if (charWidth <= 0) charWidth = 1;
+    if( charWidth <= 0 ) {
+        charWidth = 1;
+    }
 
     int clickedLineOffset = static_cast<int>( event->position().y() ) / lineHeight;
     int targetLine = verticalScrollBar()->value() + clickedLineOffset;
@@ -440,14 +512,18 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
 
     if( piece_table_ == nullptr || !line_manager_ ) {
         painter.setPen( Qt::gray );
-        painter.drawText( viewport()->rect(), Qt::AlignCenter, "Please open a file (File -> Open or Ctrl+O)" );
+        painter.drawText( viewport()->rect(), Qt::AlignCenter,
+                          "Please open a file (File -> Open or Ctrl+O)" );
         return;
     }
 
     QFontMetrics fontMetrics( font() );
     int lineHeight = fontMetrics.height() + kLineHeightPadding;
     int charWidth = fontMetrics.horizontalAdvance( 'A' );
-    if (charWidth <= 0) charWidth = 1;
+    if( charWidth <= 0 ) {
+        charWidth = 1;
+    }
+    gutter_width_ = kGutterDigits * charWidth + kGutterTextPadding * 2;
 
     painter.fillRect( 0, 0, gutter_width_, viewport()->height(), QColor( "#f0f0f0" ) );
     painter.setPen( QColor( "#d0d0d0" ) );
@@ -485,9 +561,9 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
         int yText = yBase + fontMetrics.ascent() + 2;
 
         painter.setPen( QColor( "#808080" ) );
-        painter.drawText( QRect( 0, yBase, gutter_width_ - kLineHeightPadding, lineHeight ),
+        painter.drawText( QRect( 0, yBase, gutter_width_ - kGutterTextPadding, lineHeight ),
                           static_cast<int>( Qt::AlignRight | Qt::AlignVCenter ),
-                          QString::number( currentLineIndex + 1 ) );
+                          formatLineNumber( currentLineIndex + 1 ) );
 
         painter.save();
         painter.setClipRect( gutter_width_ + 1, yBase, viewport()->width() - gutter_width_ - 1, lineHeight );

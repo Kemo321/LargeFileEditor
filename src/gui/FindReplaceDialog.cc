@@ -1,6 +1,7 @@
 #include "gui/FindReplaceDialog.h"
 
 #include <QHBoxLayout>
+#include <QHideEvent>
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -37,6 +38,12 @@ auto FindReplaceDialog::showReplace() -> void
     show();
     raise();
     activateWindow();
+}
+
+auto FindReplaceDialog::hideEvent( QHideEvent* event ) -> void
+{
+    QDialog::hideEvent( event );
+    emit dialogClosed();
 }
 
 auto FindReplaceDialog::mousePressEvent( QMouseEvent* event ) -> void

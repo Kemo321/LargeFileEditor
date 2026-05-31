@@ -75,8 +75,9 @@ public:
     /**
      * @brief Translates a logical byte position to view coordinates and jumps to it.
      * @param pos Logical byte position.
+     * @param matchLength Byte length of the match to ensure full visibility (0 = cursor only).
      */
-    auto jumpToLogicalPosition( uint64_t pos ) -> void;
+    auto jumpToLogicalPosition( uint64_t pos, int matchLength = 0 ) -> void;
 
     /**
      * @brief Forces a complete repaint and cache invalidation.
@@ -110,6 +111,12 @@ protected:
      * @param event The resize event.
      */
     auto resizeEvent( QResizeEvent* event ) -> void override;
+
+    /**
+     * @brief Handles font and other property changes to refresh layout metrics.
+     * @param event The change event.
+     */
+    auto changeEvent( QEvent* event ) -> void override;
 
     /**
      * @brief Handles mouse wheel events for scrolling.
@@ -155,6 +162,5 @@ private:
     QTimer* cursor_timer_{ nullptr };
     QTimer* line_offset_timer_{ nullptr };
 
-    static constexpr int kDefaultGutterWidth = 50;
-    int gutter_width_{ kDefaultGutterWidth };
+    int gutter_width_{ 60 };
 };

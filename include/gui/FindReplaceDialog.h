@@ -8,6 +8,7 @@
 
 #include <QCheckBox>
 #include <QDialog>
+#include <QHideEvent>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QString>
@@ -44,8 +45,17 @@ signals:
                                bool matchWord ) -> void;
     auto replaceAllRequested( const QString& findText, const QString& replaceText, bool matchCase,
                               bool matchWord ) -> void;
+    /**
+     * @brief Emitted when the dialog is hidden (via Close button or Escape key).
+     */
+    auto dialogClosed() -> void;
 
 protected:
+    /**
+     * @brief Emits dialogClosed() when the dialog becomes hidden.
+     * @param event The hide event.
+     */
+    auto hideEvent( QHideEvent* event ) -> void override;
     auto mousePressEvent( QMouseEvent* event ) -> void override;
 
 private:
