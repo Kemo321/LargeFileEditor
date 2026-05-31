@@ -587,8 +587,8 @@ TEST_F( PieceTableTest, ReplaceAllProgressReportsCompletion )
 
     EXPECT_EQ( count, 5 );
     EXPECT_EQ( pieceTable.getText(), "b b b b b" );
-    EXPECT_EQ( lastDone, 5 );  // final progress() call reports done == total
-    EXPECT_EQ( lastTotal, 5 );
+    EXPECT_GT( lastTotal, 0U );        // progress was reported (byte-based span)
+    EXPECT_EQ( lastDone, lastTotal );  // final progress() call reports 100%
 }
 
 TEST_F( PieceTableTest, UndoRedoEmptyHistory )

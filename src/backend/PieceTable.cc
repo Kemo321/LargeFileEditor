@@ -252,8 +252,21 @@ auto PieceTable::computeLPS( const std::string& pattern ) -> std::vector<int>
 auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool matchWord ) const
     -> std::vector<uint64_t>
 {
+    static const std::atomic<bool> never{ false };
+    return findAllImpl(
+        pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+}
+
+auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
+                              const std::function<void( uint64_t, uint64_t )>& progress,
+                              const std::atomic<bool>& cancel ) const -> std::vector<uint64_t>
+{
+    // Poll progress/cancel roughly every 1 MiB of scanned bytes.
+    static constexpr uint64_t kScanProgressMask = ( 1ULL << 20 ) - 1;
+
     std::vector<uint64_t> results;
-    if( pattern.empty() || size() == 0 ) {
+    const uint64_t totalBytes = size();
+    if( pattern.empty() || totalBytes == 0 ) {
         return results;
     }
 
@@ -276,6 +289,13 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
         }
 
         for( uint64_t idx = 0; idx < piece.length_; ++idx ) {
+            if( ( logical_pos & kScanProgressMask ) == 0 ) {
+                if( cancel.load( std::memory_order_relaxed ) ) {
+                    return {};
+                }
+                progress( logical_pos, totalBytes );
+            }
+
             char currentChar = bufferPtr[piece.start_ + idx];
             char compareChar = matchCase ? currentChar
                                          : static_cast<char>( std::tolower(
@@ -297,7 +317,7 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
                     if( std::isalnum( static_cast<unsigned char>( before ) ) != 0 ) {
                         keepResult = false;
                     }
-                    if( keepResult && ( foundPos + matchIdx < size() ) ) {
+                    if( keepResult && ( foundPos + matchIdx < totalBytes ) ) {
                         char after = getSubstr( foundPos + matchIdx, 1 )[0];
                         if( std::isalnum( static_cast<unsigned char>( after ) ) != 0 ) {
                             keepResult = false;
@@ -337,8 +357,17 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
     if( pattern.empty() ) {
         return 0;
     }
-    std::vector<uint64_t> occurrences = findAll( pattern, matchCase, matchWord );
-    if( occurrences.empty() ) {
+
+    // The whole operation is two byte-sized passes (scan + merge); report progress over
+    // 2 * totalBytes so the bar climbs monotonically 0->100% across both phases.
+    const uint64_t totalBytes = size();
+    const uint64_t progressSpan = 2 * totalBytes;
+    auto scanProgress = [&progress, progressSpan]( uint64_t bytesScanned, uint64_t /*total*/ ) {
+        progress( bytesScanned, progressSpan );
+    };
+    std::vector<uint64_t> occurrences =
+        findAllImpl( pattern, matchCase, matchWord, scanProgress, cancel );
+    if( occurrences.empty() ) {  // no matches, or canceled mid-scan (nothing mutated yet)
         return 0;
     }
 
@@ -371,7 +400,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
         }
     };
 
-    const uint64_t total = occurrences.size();
+    const uint64_t matchCount = occurrences.size();
     uint64_t done = 0;
 
     for( uint64_t occ : occurrences ) {
@@ -389,15 +418,16 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
         }
         advance( occ + patternLen, false );  // skip the matched source bytes
         if( ( ++done % kProgressStride ) == 0 ) {
-            progress( done, total );
+            // Merge occupies the second half of the bar; also refreshes the cancel bridge.
+            progress( totalBytes + cursor, progressSpan );
         }
     }
-    advance( size(), true );  // copy the tail
+    advance( totalBytes, true );  // copy the tail (pieces_ not yet mutated, so size == totalBytes)
 
     saveState();
     pieces_ = std::move( newPieces );
-    progress( total, total );
-    return total;
+    progress( progressSpan, progressSpan );
+    return matchCount;
 }
 
 auto PieceTable::replaceFirst( const std::string& pattern, const std::string& replacement,

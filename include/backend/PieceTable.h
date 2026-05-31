@@ -220,6 +220,13 @@ public:
 private:
     [[nodiscard]] static auto computeLPS( const std::string& pattern ) -> std::vector<int>;
 
+    // Shared KMP scan backing findAll/replaceAll. Reports byte-based progress and
+    // aborts (returns the matches found so far is NOT done — returns empty) when cancel is set.
+    [[nodiscard]] auto findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
+                                    const std::function<void( uint64_t, uint64_t )>& progress,
+                                    const std::atomic<bool>& cancel ) const
+        -> std::vector<uint64_t>;
+
     std::vector<std::vector<Piece>> undoStack_;
     std::vector<std::vector<Piece>> redoStack_;
 

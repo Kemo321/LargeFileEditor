@@ -84,6 +84,15 @@ public:
      */
     auto refreshView() -> void;
 
+    /**
+     * @brief Suspends/resumes rendering while a background task mutates the backend.
+     *
+     * While busy the viewer must not read the PieceTable (a worker thread owns it),
+     * so painting and line-offset refreshes are skipped and the cursor blink is paused.
+     * @param busy True to suspend rendering, false to resume.
+     */
+    auto setBusy( bool busy ) -> void;
+
 signals:
     /**
      * @brief Emitted when the internal cursor position changes.
@@ -161,6 +170,8 @@ private:
     bool cursor_visible_{ true };
     QTimer* cursor_timer_{ nullptr };
     QTimer* line_offset_timer_{ nullptr };
+
+    bool render_busy_{ false };
 
     int gutter_width_{ 60 };
 };

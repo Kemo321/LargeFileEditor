@@ -599,6 +599,7 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
 
     replace_canceled_ = false;
     viewer_->setEnabled( false );
+    viewer_->setBusy( true );  // worker owns the PieceTable; viewer must not read it
     save_act_->setEnabled( false );
     open_act_->setEnabled( false );
 
@@ -633,6 +634,7 @@ auto MainWindow::onReplaceAllFinished() -> void
     task_progress_bar_->hide();
     cancel_task_btn_->hide();
     viewer_->setEnabled( true );
+    viewer_->setBusy( false );  // re-enable rendering before any refreshView/paint
     save_act_->setEnabled( true );
     open_act_->setEnabled( true );
 

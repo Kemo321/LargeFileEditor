@@ -132,6 +132,19 @@ auto LargeFileViewer::refreshView() -> void
     viewport()->update();
 }
 
+auto LargeFileViewer::setBusy( bool busy ) -> void
+{
+    render_busy_ = busy;
+    if( cursor_timer_ != nullptr ) {
+        if( busy ) {
+            cursor_timer_->stop();
+        } else {
+            cursor_timer_->start( kCursorBlinkRateMs );
+        }
+    }
+    viewport()->update();
+}
+
 auto LargeFileViewer::jumpToLogicalPosition( uint64_t pos, int matchLength ) -> void
 {
     if( piece_table_ == nullptr || !line_manager_ ) {
@@ -213,7 +226,7 @@ auto LargeFileViewer::changeEvent( QEvent* event ) -> void
 
 auto LargeFileViewer::refreshLineOffsets() -> void
 {
-    if( piece_table_ == nullptr || !line_manager_ ) {
+    if( piece_table_ == nullptr || !line_manager_ || render_busy_ ) {
         return;
     }
 
@@ -515,6 +528,12 @@ auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
 {
     QPainter painter( viewport() );
     painter.fillRect( event->rect(), Qt::white );
+
+    if( render_busy_ ) {
+        painter.setPen( Qt::gray );
+        painter.drawText( viewport()->rect(), Qt::AlignCenter, "Replacing…" );
+        return;
+    }
 
     if( piece_table_ == nullptr || !line_manager_ ) {
         painter.setPen( Qt::gray );
