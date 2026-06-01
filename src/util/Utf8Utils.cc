@@ -30,7 +30,7 @@ auto snapToCharacterBoundary( const std::function<unsigned char( uint64_t )>& by
         if( !isContinuationByte( byte ) ) {
             return position - backOffset;
         }
-        backOffset++;
+        ++backOffset;
     }
     return position;
 }

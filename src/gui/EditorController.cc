@@ -76,7 +76,7 @@ auto EditorController::handleKeyPress( QKeyEvent* event ) -> bool
 auto EditorController::moveCursorLeft( int& line, int& col ) -> void
 {
     if( col > 0 ) {
-        col--;
+        --col;
         uint64_t lineStart = lineManager_->getLineOffset( line );
         while( col > 0 ) {
             std::string b = pieceTable_->getSubstr( lineStart + col, 1 );
@@ -86,10 +86,10 @@ auto EditorController::moveCursorLeft( int& line, int& col ) -> void
             if( !Utf8Utils::isContinuationByte( static_cast<unsigned char>( b[0] ) ) ) {
                 break;
             }
-            col--;
+            --col;
         }
     } else if( line > 0 ) {
-        line--;
+        --line;
         col = static_cast<int>( lineManager_->getVirtualLineLength( line ) );
     }
 }
@@ -100,13 +100,13 @@ auto EditorController::moveCursorRight( int& line, int& col ) -> void
     if( col < static_cast<int>( lineLen ) ) {
         uint64_t lineStart = lineManager_->getLineOffset( line );
         std::string b = pieceTable_->getSubstr( lineStart + col, 1 );
-        col++;
+        ++col;
         if( !b.empty() ) {
             col += Utf8Utils::sequenceLength( static_cast<unsigned char>( b[0] ) ) - 1;
         }
         col = std::min( col, static_cast<int>( lineLen ) );
     } else if( line < lineManager_->getLineCount() - 1 ) {
-        line++;
+        ++line;
         col = 0;
     }
 }
@@ -114,7 +114,7 @@ auto EditorController::moveCursorRight( int& line, int& col ) -> void
 auto EditorController::moveCursorUp( int& line, int& col ) -> void
 {
     if( line > 0 ) {
-        line--;
+        --line;
         col = std::min( col, static_cast<int>( lineManager_->getVirtualLineLength( line ) ) );
     }
 }
@@ -122,7 +122,7 @@ auto EditorController::moveCursorUp( int& line, int& col ) -> void
 auto EditorController::moveCursorDown( int& line, int& col ) -> void
 {
     if( line < lineManager_->getLineCount() - 1 ) {
-        line++;
+        ++line;
         col = std::min( col, static_cast<int>( lineManager_->getVirtualLineLength( line ) ) );
     }
 }
@@ -145,15 +145,15 @@ auto EditorController::handleBackspace( int& line, int& col ) -> bool
         if( !Utf8Utils::isContinuationByte( static_cast<unsigned char>( b[0] ) ) ) {
             break;
         }
-        check_col--;
-        bytes_to_remove++;
+        --check_col;
+        ++bytes_to_remove;
     }
     pieceTable_->remove( pos - bytes_to_remove, bytes_to_remove );
     emit documentEdited( pos - bytes_to_remove );
     if( col > 0 ) {
         col -= bytes_to_remove;
     } else {
-        line--;
+        --line;
         col = static_cast<int>( lineManager_->getVirtualLineLength( line ) );
     }
     return true;
@@ -181,7 +181,7 @@ auto EditorController::handleNewline( int& line, int& col ) -> bool
     uint64_t pos = logicalPosition( line, col );
     pieceTable_->insert( pos, "\n" );
     emit documentEdited( pos );
-    line++;
+    ++line;
     col = 0;
     return true;
 }

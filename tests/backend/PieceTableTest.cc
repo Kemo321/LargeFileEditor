@@ -524,7 +524,7 @@ TEST_F( PieceTableTest, ReplaceAllConsecutiveOccurrences )
 TEST_F( PieceTableTest, ReplaceAllMassiveFragmentation )
 {
     PieceTable pieceTable;
-    for( int idx = 0; idx < 5; idx++ ) {
+    for( int idx = 0; idx < 5; ++idx ) {
         pieceTable.insert( pieceTable.size(), "A " );
     }
 
@@ -633,7 +633,7 @@ TEST_F( PieceTableTest, HistorySizeLimitEnforcement )
 
     int successfulUndos = 0;
     while( testTable.undo() ) {
-        successfulUndos++;
+        ++successfulUndos;
     }
 
     EXPECT_EQ( successfulUndos, 100 );
@@ -765,7 +765,7 @@ TEST_F( PieceTableTest, ReplaceAllCoalescesFragmentedTable )
     // Build a fragmented table out of many small inserts, then replaceAll. The defrag
     // pass must preserve the exact text and the cached size regardless of piece merging.
     PieceTable pieceTable;
-    for( int idx = 0; idx < 6; idx++ ) {
+    for( int idx = 0; idx < 6; ++idx ) {
         pieceTable.insert( pieceTable.size(), "ab " );
     }
     ASSERT_EQ( pieceTable.getText(), "ab ab ab ab ab ab " );
@@ -788,7 +788,7 @@ TEST_F( PieceTableTest, FindPieceAtBinarySearchRoundTrip )
     // findPieceAt + the cumulative-offset index) must agree with a flat getText() for every
     // position, length, and piece boundary.
     PieceTable pieceTable( createTempFile( "0123456789" ) );
-    for( int idx = 0; idx < 12; idx++ ) {
+    for( int idx = 0; idx < 12; ++idx ) {
         // Interleave inserts at varied positions to splinter the table into many pieces.
         pieceTable.insert( static_cast<uint64_t>( idx ) % ( pieceTable.size() + 1 ),
                            "<" + std::to_string( idx ) + ">" );

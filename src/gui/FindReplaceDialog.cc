@@ -10,7 +10,7 @@
 
 FindReplaceDialog::FindReplaceDialog( QWidget* parent ) : QDialog( parent )
 {
-    setWindowTitle( "Find and Replace" );
+    setWindowTitle( "Znajdź i zamień" );
     setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint );
     setModal( false );
 
@@ -65,20 +65,20 @@ auto FindReplaceDialog::setupUi() -> void
     auto* findLayout = new QVBoxLayout( findTab );
 
     auto* findInputLayout1 = new QHBoxLayout();
-    findInputLayout1->addWidget( new QLabel( "Find what:" ) );
+    findInputLayout1->addWidget( new QLabel( "Znajdź:" ) );
     find_input_1_ = new QLineEdit();
     findInputLayout1->addWidget( find_input_1_ );
     findLayout->addLayout( findInputLayout1 );
 
-    match_case_1_ = new QCheckBox( "Match case" );
-    match_word_1_ = new QCheckBox( "Match whole word" );
+    match_case_1_ = new QCheckBox( "Uwzględnij wielkość liter" );
+    match_word_1_ = new QCheckBox( "Całe słowa" );
     findLayout->addWidget( match_case_1_ );
     findLayout->addWidget( match_word_1_ );
 
     auto* findButtonLayout = new QHBoxLayout();
     findButtonLayout->addStretch();
-    auto* btnFindNext1 = new QPushButton( "Find Next" );
-    auto* btnClose1 = new QPushButton( "Close" );
+    auto* btnFindNext1 = new QPushButton( "Znajdź następny" );
+    auto* btnClose1 = new QPushButton( "Zamknij" );
     findButtonLayout->addWidget( btnFindNext1 );
     findButtonLayout->addWidget( btnClose1 );
     connect( btnClose1, &QPushButton::clicked, this, &QDialog::hide );
@@ -94,28 +94,28 @@ auto FindReplaceDialog::setupUi() -> void
     auto* replaceLayout = new QVBoxLayout( replaceTab );
 
     auto* findInputLayout2 = new QHBoxLayout();
-    findInputLayout2->addWidget( new QLabel( "Find what:" ) );
+    findInputLayout2->addWidget( new QLabel( "Znajdź:" ) );
     find_input_2_ = new QLineEdit();
     findInputLayout2->addWidget( find_input_2_ );
     replaceLayout->addLayout( findInputLayout2 );
 
     auto* replaceInputLayout = new QHBoxLayout();
-    replaceInputLayout->addWidget( new QLabel( "Replace with:" ) );
+    replaceInputLayout->addWidget( new QLabel( "Zamień na:" ) );
     replace_input_ = new QLineEdit();
     replaceInputLayout->addWidget( replace_input_ );
     replaceLayout->addLayout( replaceInputLayout );
 
-    match_case_2_ = new QCheckBox( "Match case" );
-    match_word_2_ = new QCheckBox( "Match whole word" );
+    match_case_2_ = new QCheckBox( "Uwzględnij wielkość liter" );
+    match_word_2_ = new QCheckBox( "Całe słowa" );
     replaceLayout->addWidget( match_case_2_ );
     replaceLayout->addWidget( match_word_2_ );
 
     auto* replaceButtonLayout = new QHBoxLayout();
     replaceButtonLayout->addStretch();
-    auto* btnFindNext2 = new QPushButton( "Find Next" );
-    auto* btnReplace = new QPushButton( "Replace" );
-    auto* btnReplaceAll = new QPushButton( "Replace All" );
-    auto* btnClose2 = new QPushButton( "Close" );
+    auto* btnFindNext2 = new QPushButton( "Znajdź następny" );
+    auto* btnReplace = new QPushButton( "Zamień" );
+    auto* btnReplaceAll = new QPushButton( "Zamień wszystko" );
+    auto* btnClose2 = new QPushButton( "Zamknij" );
     replaceButtonLayout->addWidget( btnFindNext2 );
     replaceButtonLayout->addWidget( btnReplace );
     replaceButtonLayout->addWidget( btnReplaceAll );
@@ -138,8 +138,8 @@ auto FindReplaceDialog::setupUi() -> void
 
     replaceLayout->addLayout( replaceButtonLayout );
 
-    tab_widget_->addTab( findTab, "Find" );
-    tab_widget_->addTab( replaceTab, "Replace" );
+    tab_widget_->addTab( findTab, "Znajdź" );
+    tab_widget_->addTab( replaceTab, "Zamień" );
     mainLayout->addWidget( tab_widget_ );
     setLayout( mainLayout );
 }

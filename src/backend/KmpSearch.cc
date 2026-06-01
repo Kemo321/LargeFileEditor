@@ -12,15 +12,15 @@ auto KmpSearch::computeLPS( const std::string& pattern ) -> std::vector<int>
 
     while( idx < length ) {
         if( pattern[idx] == pattern[len] ) {
-            len++;
+            ++len;
             lps[idx] = len;
-            idx++;
+            ++idx;
         } else {
             if( len != 0 ) {
                 len = lps[len - 1];
             } else {
                 lps[idx] = 0;
-                idx++;
+                ++idx;
             }
         }
     }
@@ -73,7 +73,7 @@ auto KmpSearch::findAll( const std::vector<Span>& spans, uint64_t totalBytes,
                 matchIdx = lps[matchIdx - 1];
             }
             if( searchPattern[matchIdx] == compareChar ) {
-                matchIdx++;
+                ++matchIdx;
             }
 
             if( matchIdx == static_cast<int>( searchPattern.length() ) ) {
@@ -96,12 +96,10 @@ auto KmpSearch::findAll( const std::vector<Span>& spans, uint64_t totalBytes,
                 if( keepResult ) {
                     results.push_back( foundPos );
                 }
-                // Non-overlapping semantics: resume scanning after the consumed match
-                // (both accepted and word-boundary-rejected terminal branches reset to 0)
-                // so successive matches are always at least patternLen apart.
+                // Non-overlapping: reset so successive matches are >= patternLen apart.
                 matchIdx = 0;
             }
-            logical_pos++;
+            ++logical_pos;
         }
     }
     return results;

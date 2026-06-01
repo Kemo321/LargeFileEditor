@@ -50,9 +50,8 @@ auto formatLineNumber( int lineNum ) -> QString
     return QString::number( value, 'f', decimals ) + QChar( suffix );
 }
 
-// Per-repaint, per-line drawing state shared by the render pipeline helpers below. The leading
-// members are loop invariants set once in paint(); the trailing members are recomputed per line by
-// prepareLine().
+// Per-line drawing state: leading members are loop invariants set in paint(); trailing members are
+// recomputed per line by prepareLine().
 struct LineDrawContext {
     QPainter& painter_;
     const RenderContext& ctx_;
@@ -86,14 +85,14 @@ auto setupBackground( QPainter& painter, const QRect& eventRect, const RenderCon
 
     if( ctx.renderBusy_ ) {
         painter.setPen( Qt::gray );
-        painter.drawText( viewportRect, Qt::AlignCenter, "Replacing…" );
+        painter.drawText( viewportRect, Qt::AlignCenter, "Zamienianie…" );
         return false;
     }
 
     if( ctx.pieceTable_ == nullptr || ctx.lineManager_ == nullptr ) {
         painter.setPen( Qt::gray );
         painter.drawText( viewportRect, Qt::AlignCenter,
-                          "Please open a file (File -> Open or Ctrl+O)" );
+                          "Otwórz plik (Plik -> Otwórz lub Ctrl+O)" );
         return false;
     }
 
