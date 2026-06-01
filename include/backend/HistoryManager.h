@@ -15,18 +15,13 @@
  * @class HistoryManager
  * @brief Owns the undo/redo history of piece-list snapshots and the save/dirty bookkeeping.
  *
- * The PieceTable hands its current piece list to @ref recordState before each mutation and
- * swaps it through @ref undo / @ref redo, keeping all history policy (count cap, memory cap,
- * batch suppression) in one place.
+ * Centralizes history policy (count cap, memory cap, batch suppression) for the PieceTable.
  */
 class HistoryManager {
 public:
     /**
-     * @brief A historical document state: the piece sequence plus the cursor byte offset that
-     *        should regain focus when this state is restored.
-     *
-     * The @ref cursorOffset_ describes the edit transition that produced the state, so the same
-     * value drives the cursor jump whether the state is reached by undo or by redo.
+     * @brief A historical document state: the piece sequence plus the cursor byte offset to
+     *        refocus when this state is restored (same value drives both undo and redo jumps).
      */
     struct Snapshot {
         std::vector<Piece> pieces_;
@@ -36,8 +31,7 @@ public:
     /**
      * @brief Records @p current as an undo point and clears the redo stack.
      *
-     * No-op while a batch operation is in progress. Evicts oldest snapshots to respect the
-     * count and total-memory caps (always keeping at least the most recent).
+     * No-op during a batch operation. Evicts oldest snapshots to respect the count/memory caps.
      *
      * @param current The pre-mutation piece list to snapshot.
      * @param cursorOffset Logical byte offset of the edit, restored on undo/redo.

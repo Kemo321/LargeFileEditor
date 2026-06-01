@@ -75,9 +75,8 @@ public:
     /**
      * @brief Replaces all occurrences with progress reporting and cancellation.
      *
-     * Single-pass, transactional rebuild: the document is never mutated until the
-     * operation completes. If @p cancel becomes true (or an exception occurs) the
-     * PieceTable is left exactly as it was before the call (rollback) and 0 is returned.
+     * Single-pass transactional rebuild: on cancel or exception the table is rolled back and 0
+     * returned; the document is never left partially mutated.
      *
      * @param pattern The string to search for.
      * @param replacement The string to substitute.
@@ -128,8 +127,8 @@ public:
      * @param length Length of the range.
      * @return Vector of intersecting pieces.
      */
-    [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const
-        -> std::vector<Piece>;
+    [[nodiscard]] auto getFragmentsInRange( uint64_t position,
+                                            uint64_t length ) const -> std::vector<Piece>;
 
     /**
      * @brief Inserts text at the specified logical position.
@@ -194,8 +193,7 @@ public:
     }
 
 private:
-    // Shared KMP scan backing findAll/replaceAll. Resolves pieces_ into spans and delegates to
-    // KmpSearch. Reports byte-based progress and returns empty when cancel is set.
+    // Shared KMP scan backing findAll/replaceAll; resolves pieces_ into spans for KmpSearch.
     [[nodiscard]] auto findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
                                     const std::function<void( uint64_t, uint64_t )>& progress,
                                     const std::atomic<bool>& cancel ) const
@@ -209,13 +207,10 @@ private:
     [[nodiscard]] auto findPieceAt( uint64_t position ) const -> FindResult;
     auto splitPiece( size_t pieceIndex, uint64_t offset ) -> void;
 
-    // Rebuilds pieceStartOffsets_ (prefix sums of piece lengths) in one O(pieces) pass and
-    // sets total_size_ = pieceStartOffsets_.back(). Single source of truth for size + offsets;
-    // must be called after every structural change to pieces_.
+    // Rebuilds pieceStartOffsets_ prefix sums and total_size_; call after any change to pieces_.
     auto rebuildOffsetIndex() -> void;
 
-    // Merges adjacent pieces that reference contiguous spans of the same buffer, shrinking
-    // pieces_ after a fragmenting batch operation (length-preserving; total_size_ untouched).
+    // Merges adjacent pieces referencing contiguous spans of the same buffer (length-preserving).
     auto coalescePieces() -> void;
 
     MemoryMappedFile mappedFile_;
@@ -223,14 +218,12 @@ private:
     std::string addBuffer_;
     std::vector<Piece> pieces_;
 
-    // Prefix sums of piece lengths: pieceStartOffsets_[i] is the logical start of pieces_[i],
-    // size() == pieceStartOffsets_.size() - 1, and pieceStartOffsets_.back() == total_size_.
-    // Enables O(log n) findPieceAt via binary search.
+    // Prefix sums of piece lengths (pieceStartOffsets_.back() == total_size_); enables O(log n)
+    // findPieceAt via binary search.
     std::vector<uint64_t> pieceStartOffsets_{ 0 };
 
     uint64_t total_size_{ 0 };  // cached sum of piece lengths; size() returns this in O(1)
 
-    // Mutable so the const saveToFile() can update the saved-marker without altering the logical
-    // document; markSaved() touches only history bookkeeping, not the text content.
+    // Mutable so const saveToFile() can update the saved-marker (history bookkeeping only).
     mutable HistoryManager history_;
 };

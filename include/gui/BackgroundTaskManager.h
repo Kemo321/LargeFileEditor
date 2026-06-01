@@ -17,10 +17,9 @@ class PieceTable;
  * @class BackgroundTaskManager
  * @brief Owns the QtConcurrent workers and QFutureWatchers for long-running operations.
  *
- * Keeps the threading/cancellation plumbing out of @ref MainWindow, which only reacts to the
- * Qt-typed result signals to update UI state. The PieceTable is owned by the caller; while a task
- * runs the worker thread holds the raw pointer, so the caller must keep it alive (and must not read
- * it) until the matching finished signal fires.
+ * Keeps threading/cancellation plumbing out of @ref MainWindow. The caller-owned PieceTable is
+ * held by the worker thread while a task runs, so the caller must keep it alive and not read it
+ * until the matching finished signal fires.
  */
 class BackgroundTaskManager : public QObject {
     Q_OBJECT
@@ -32,8 +31,8 @@ public:
     auto startSave( PieceTable* table, const QString& tempPath ) -> void;
 
     /// Searches @p table for @p text on a worker thread; emits @ref findFinished.
-    auto startFind( PieceTable* table, const QString& text, bool matchCase, bool matchWord )
-        -> void;
+    auto startFind( PieceTable* table, const QString& text, bool matchCase,
+                    bool matchWord ) -> void;
 
     /// Replaces every match in @p table on a worker thread; emits progress and @ref
     /// replaceFinished.

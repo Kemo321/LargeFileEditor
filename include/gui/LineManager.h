@@ -30,7 +30,7 @@ public:
 
     /**
      * @brief Gets the estimated total number of virtual lines.
-     * For uncalculated portions, it estimates based on average line lengauto
+     * Uncalculated portions are estimated from the average line length.
      */
     auto getLineCount() -> int;
 
@@ -45,7 +45,7 @@ public:
     void reset();
 
     /**
-     * @brief Helper to get the length of a virtual linautoes.
+     * @brief Helper to get the length of a virtual line.
      */
     auto getVirtualLineLength( int virtual_line ) -> uint64_t;
 
@@ -57,8 +57,8 @@ public:
     /**
      * @brief Gets a chunk of a line, ensuring UTF-8 boundaries.
      */
-    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col, uint64_t length )
-        -> std::string;
+    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col,
+                                     uint64_t length ) -> std::string;
 
 private:
     void ensureLineCalculated( int target_line );

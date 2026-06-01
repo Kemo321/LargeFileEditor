@@ -60,8 +60,7 @@ signals:
     /**
      * @brief Emitted when the document is edited; @p changedOffset is the first affected byte.
      *
-     * Connected synchronously so the view's line cache is invalidated before subsequent
-     * line-length queries in the same handler.
+     * Connect synchronously: the view's line cache must be invalidated before later queries.
      */
     void documentEdited( uint64_t changedOffset );
 

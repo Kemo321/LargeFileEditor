@@ -15,8 +15,8 @@
  * @class KmpSearch
  * @brief Stateless KMP matcher operating on the raw buffers behind a piece sequence.
  *
- * Decoupled from PieceTable: callers resolve their pieces into ordered @ref Span values and
- * supply a random-access byte accessor for whole-word boundary checks.
+ * Callers resolve their pieces into ordered @ref Span values and supply a byte accessor for
+ * whole-word boundary checks.
  */
 class KmpSearch {
 public:
@@ -50,6 +50,6 @@ public:
     [[nodiscard]] static auto findAll( const std::vector<Span>& spans, uint64_t totalBytes,
                                        const std::string& pattern, bool matchCase, bool matchWord,
                                        const std::function<char( uint64_t )>& byteAt,
-                                       const ProgressFn& progress, const std::atomic<bool>& cancel )
-        -> std::vector<uint64_t>;
+                                       const ProgressFn& progress,
+                                       const std::atomic<bool>& cancel ) -> std::vector<uint64_t>;
 };
