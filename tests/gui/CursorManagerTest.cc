@@ -32,7 +32,7 @@ TEST_F( CursorManagerTest, PositionState )
 TEST_F( CursorManagerTest, VisibilityToggle )
 {
     CursorManager cursor;
-    EXPECT_TRUE( cursor.isVisible() );  // visible by default
+    EXPECT_TRUE( cursor.isVisible() );
 
     cursor.setVisible( false );
     EXPECT_FALSE( cursor.isVisible() );
