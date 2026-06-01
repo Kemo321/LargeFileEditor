@@ -190,26 +190,6 @@ public:
         return history_.isDirty();
     }
 
-    /**
-     * @brief Calculates the total number of lines in the document.
-     * @return Line count.
-     */
-    // [[nodiscard]] auto getLineCount() const -> int;
-
-    /**
-     * @brief Finds the starting byte position of a given line.
-     * @param line Zero-based line index.
-     * @return Logical byte position.
-     */
-    // [[nodiscard]] auto getLineStart( int line ) const -> uint64_t;
-
-    /**
-     * @brief Determines the line number for a specific byte position.
-     * @param position Logical byte position.
-     * @return Zero-based line index.
-     */
-    // [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
-
 private:
     // Shared KMP scan backing findAll/replaceAll. Resolves pieces_ into spans and delegates to
     // KmpSearch. Reports byte-based progress and returns empty when cancel is set.
@@ -247,5 +227,7 @@ private:
 
     uint64_t total_size_{ 0 };  // cached sum of piece lengths; size() returns this in O(1)
 
-    HistoryManager history_;
+    // Mutable so the const saveToFile() can update the saved-marker without altering the logical
+    // document; markSaved() touches only history bookkeeping, not the text content.
+    mutable HistoryManager history_;
 };

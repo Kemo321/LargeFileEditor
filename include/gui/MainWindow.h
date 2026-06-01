@@ -68,6 +68,14 @@ private:
     auto updateWindowTitle() -> void;
     auto processFindResults() -> void;
 
+    // Defers window close until a running background save completes: ignores the event, disables
+    // the UI, and shows a waiting status. The close is re-issued from onSaveFinished().
+    auto beginCloseWait( QCloseEvent* event ) -> void;
+
+    // Completes a deferred close once a save has finished: re-issues close() on success, or
+    // restores the UI if the save failed (document still modified). No-op when no close pending.
+    auto finalizePendingClose() -> void;
+
     LargeFileViewer* viewer_;
     FindReplaceDialog* find_replace_dialog_{};
     std::unique_ptr<PieceTable> piece_table_;
@@ -100,4 +108,6 @@ private:
     bool current_match_word_{ false };
 
     BackgroundTaskManager* tasks_{};
+
+    bool close_after_save_{ false };
 };

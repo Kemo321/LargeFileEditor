@@ -213,7 +213,7 @@ auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
     }
 
     if( outFile.good() ) {
-        const_cast<PieceTable*>( this )->history_.markSaved();
+        history_.markSaved();
         return true;
     }
     return false;

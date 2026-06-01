@@ -91,30 +91,47 @@ MainWindow::~MainWindow()
 
 auto MainWindow::closeEvent( QCloseEvent* event ) -> void
 {
-    if( isWindowModified() ) {
-        QMessageBox msgBox(
-            QMessageBox::Warning, "Unsaved Changes",
-            "The document has been modified. Do you want to save your changes before closing?",
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this );
-        msgBox.setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint );
+    // A save kicked off earlier (or by the prompt below) is still running: never block the GUI
+    // thread waiting for it — defer the close until onSaveFinished() re-issues it.
+    if( tasks_->isSaveRunning() ) {
+        beginCloseWait( event );
+        return;
+    }
 
-        int reply = msgBox.exec();
+    if( !isWindowModified() ) {
+        event->accept();
+        return;
+    }
 
-        if( reply == QMessageBox::Save ) {
-            saveFile();
-            // Since save is asynchronous, we cannot just accept immediately if we really want to
-            // wait for it. But if it's already a temp file flow, we might need to block. For
-            // simplicity and as per standard Qt flow:
-            tasks_->waitForSave();
-            event->accept();
-        } else if( reply == QMessageBox::Cancel ) {
-            event->ignore();
+    QMessageBox msgBox(
+        QMessageBox::Warning, "Unsaved Changes",
+        "The document has been modified. Do you want to save your changes before closing?",
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this );
+    msgBox.setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint );
+
+    int reply = msgBox.exec();
+
+    if( reply == QMessageBox::Save ) {
+        saveFile();  // asynchronous: starts a background save if possible
+        if( tasks_->isSaveRunning() ) {
+            beginCloseWait( event );
         } else {
             event->accept();
         }
+    } else if( reply == QMessageBox::Cancel ) {
+        event->ignore();
     } else {
         event->accept();
     }
+}
+
+auto MainWindow::beginCloseWait( QCloseEvent* event ) -> void
+{
+    event->ignore();
+    close_after_save_ = true;
+    viewer_->setEnabled( false );
+    menuBar()->setEnabled( false );
+    task_status_label_->setText( "Closing, waiting for save operation to finish..." );
 }
 
 auto MainWindow::createActions() -> void
@@ -330,6 +347,7 @@ auto MainWindow::onSaveFinished( bool success ) -> void
             task_status_label_->setText( "Save error: Rename failed" );
             QMessageBox::critical( this, "Save Error",
                                    "Could not save the file: Rename failed from temp file." );
+            finalizePendingClose();
             return;
         }
 
@@ -353,6 +371,24 @@ auto MainWindow::onSaveFinished( bool success ) -> void
             task_status_label_->setText( "Ready" );
         }
     } );
+
+    finalizePendingClose();
+}
+
+auto MainWindow::finalizePendingClose() -> void
+{
+    if( !close_after_save_ ) {
+        return;
+    }
+
+    if( isWindowModified() ) {
+        // Save failed: abandon the close and restore the UI so the user can react.
+        close_after_save_ = false;
+        menuBar()->setEnabled( true );
+        return;
+    }
+
+    close();  // re-enters closeEvent, which now accepts (no save running, not modified)
 }
 
 auto MainWindow::saveFileAs() -> void

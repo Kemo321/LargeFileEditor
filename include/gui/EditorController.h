@@ -66,6 +66,19 @@ signals:
     void documentEdited( uint64_t changedOffset );
 
 private:
+    // Cursor navigation: update (line, col) in place; no document mutation.
+    auto moveCursorLeft( int& line, int& col ) -> void;
+    auto moveCursorRight( int& line, int& col ) -> void;
+    auto moveCursorUp( int& line, int& col ) -> void;
+    auto moveCursorDown( int& line, int& col ) -> void;
+
+    // Document mutations: update (line, col), emit documentEdited, and return true if the table
+    // was modified.
+    auto handleBackspace( int& line, int& col ) -> bool;
+    auto handleDelete( int& line, int& col ) -> bool;
+    auto handleNewline( int& line, int& col ) -> bool;
+    auto insertPrintableText( const QString& text, int& line, int& col ) -> bool;
+
     CursorManager* cursor_;
     PieceTable* pieceTable_{ nullptr };
     LineManager* lineManager_{ nullptr };
