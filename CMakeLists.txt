@@ -18,6 +18,20 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Concurrent)
 
+# Coverage instrumentation must be injected BEFORE any target is defined so the
+# flags propagate to LargeFileEditor and unit_tests.
+option(ENABLE_COVERAGE "Build with coverage instrumentation (GCC/Clang)" OFF)
+
+if(ENABLE_COVERAGE)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(STATUS "Coverage instrumentation enabled.")
+    add_compile_options(--coverage -fprofile-arcs -ftest-coverage -O0 -g)
+    add_link_options(--coverage)
+  else()
+    message(WARNING "ENABLE_COVERAGE requires GCC or Clang; ignoring.")
+  endif()
+endif()
+
 include_directories(include)
 
 set(SOURCES
@@ -92,7 +106,43 @@ else()
   message(WARNING "Doxygen not found. Target 'doc' will not be created.")
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_compile_options(--coverage)
-  add_link_options(--coverage)
+# Coverage pipeline target: reset -> test -> capture -> filter -> HTML report.
+if(ENABLE_COVERAGE)
+  find_program(LCOV_PATH lcov)
+  find_program(GENHTML_PATH genhtml)
+  find_program(XVFB_RUN xvfb-run)
+
+  if(LCOV_PATH AND GENHTML_PATH)
+    if(XVFB_RUN)
+      set(_ctest_cmd ${XVFB_RUN} --auto-servernum ${CMAKE_CTEST_COMMAND}
+                     --output-on-failure)
+    else()
+      set(_ctest_cmd ${CMAKE_CTEST_COMMAND} --output-on-failure)
+    endif()
+    set(_lcov ${LCOV_PATH} --ignore-errors mismatch,unused,empty,gcov)
+
+    add_custom_target(
+      coverage
+      # 1. Reset previous instrumentation data
+      COMMAND ${_lcov} --directory ${CMAKE_BINARY_DIR} --zerocounters
+      # 2. Run all tests to emit fresh .gcda files
+      COMMAND ${_ctest_cmd}
+      # 3. Capture raw coverage
+      COMMAND ${_lcov} --directory ${CMAKE_BINARY_DIR} --capture --output-file
+              ${CMAKE_BINARY_DIR}/coverage.info
+      # 4. Filter third-party / tests / system headers
+      COMMAND
+        ${_lcov} --remove ${CMAKE_BINARY_DIR}/coverage.info /usr/* */tests/*
+        */googletest/* */extern/* --output-file
+        ${CMAKE_BINARY_DIR}/coverage.filtered.info
+      # 5. Generate HTML dashboard
+      COMMAND ${GENHTML_PATH} ${CMAKE_BINARY_DIR}/coverage.filtered.info
+              --output-directory ${CMAKE_BINARY_DIR}/coverage_report
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      DEPENDS unit_tests
+      COMMENT "Running LCOV coverage pipeline -> coverage_report/index.html"
+      VERBATIM)
+  else()
+    message(WARNING "lcov/genhtml not found; 'coverage' target unavailable.")
+  endif()
 endif()
