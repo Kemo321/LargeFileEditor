@@ -117,7 +117,7 @@ TEST( HistoryManagerTest, MemoryCapEviction )
     // (~384 MiB if all retained) must force eviction down to the cap.
     constexpr uint64_t kMaxUndoBytes = 256ULL * 1024ULL * 1024ULL;
     const uint64_t snapshotBytes = 64ULL * 1024ULL * 1024ULL;
-    const size_t piecesPerSnapshot = static_cast<size_t>( snapshotBytes / sizeof( Piece ) );
+    const auto piecesPerSnapshot = static_cast<size_t>( snapshotBytes / sizeof( Piece ) );
     constexpr int kPushes = 6;
 
     HistoryManager history;
