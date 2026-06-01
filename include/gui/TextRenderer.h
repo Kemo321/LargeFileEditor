@@ -31,8 +31,8 @@ inline constexpr int kGutterDigits = 6;
  * @brief Monospaced cell metrics derived from the current font.
  */
 struct ViewMetrics {
-    int lineHeight;
-    int charWidth;
+    int lineHeight_;
+    int charWidth_;
 };
 
 /**
@@ -45,22 +45,22 @@ struct ViewMetrics {
  * @brief All state the renderer needs for a single repaint (read-only snapshot).
  */
 struct RenderContext {
-    PieceTable* pieceTable{ nullptr };
-    LineManager* lineManager{ nullptr };
-    int startLine{ 0 };
-    int hScrollPx{ 0 };
-    int gutterWidth{ 0 };
-    QSize viewportSize;
-    QFont font;
-    int cursorLine{ 0 };
-    int cursorCol{ 0 };
-    bool cursorVisible{ false };
-    bool hasFocus{ false };
-    const std::vector<uint64_t>* searchResults{ nullptr };
-    int activeSearchIndex{ -1 };
-    int searchLength{ 0 };
-    const QStringList* mockHighlights{ nullptr };
-    bool renderBusy{ false };
+    PieceTable* pieceTable_{ nullptr };
+    LineManager* lineManager_{ nullptr };
+    int startLine_{ 0 };
+    int hScrollPx_{ 0 };
+    int gutterWidth_{ 0 };
+    QSize viewportSize_;
+    QFont font_;
+    int cursorLine_{ 0 };
+    int cursorCol_{ 0 };
+    bool cursorVisible_{ false };
+    bool hasFocus_{ false };
+    const std::vector<uint64_t>* searchResults_{ nullptr };
+    int activeSearchIndex_{ -1 };
+    int searchLength_{ 0 };
+    const QStringList* mockHighlights_{ nullptr };
+    bool renderBusy_{ false };
 };
 
 /**
@@ -75,5 +75,6 @@ public:
      * @param eventRect The region requiring repaint.
      * @param ctx Read-only snapshot of view state.
      */
-    auto paint( QPainter& painter, const QRect& eventRect, const RenderContext& ctx ) -> void;
+    static auto paint( QPainter& painter, const QRect& eventRect, const RenderContext& ctx )
+        -> void;
 };

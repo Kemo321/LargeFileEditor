@@ -41,8 +41,8 @@ TEST( Utf8UtilsTest, SnapNoOpOnLeadByte )
     std::string data = "A\xC3\xA9";  // 'A' + 'é'
     auto byteAt = byteAccessor( data );
     // Position 0 ('A') and position 1 (lead of 'é') are already boundaries.
-    EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 0, 0 ), 0u );
-    EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 0, 1 ), 1u );
+    EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 0, 0 ), 0U );
+    EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 0, 1 ), 1U );
 }
 
 TEST( Utf8UtilsTest, SnapFromMidSequence )
@@ -50,9 +50,9 @@ TEST( Utf8UtilsTest, SnapFromMidSequence )
     std::string data = "\xE2\x82\xAC";  // '€' = E2 82 AC
     auto byteAt = byteAccessor( data );
     EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 0, 1 ),
-               0u );  // 1st continuation -> lead
+               0U );  // 1st continuation -> lead
     EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 0, 2 ),
-               0u );  // 2nd continuation -> lead
+               0U );  // 2nd continuation -> lead
 }
 
 TEST( Utf8UtilsTest, SnapRespectsFloor )
@@ -60,5 +60,5 @@ TEST( Utf8UtilsTest, SnapRespectsFloor )
     std::string data = "\xE2\x82\xAC";  // all of '€'
     auto byteAt = byteAccessor( data );
     // With floor=2, snapping position 2 cannot walk back past 2.
-    EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 2, 2 ), 2u );
+    EXPECT_EQ( Utf8Utils::snapToCharacterBoundary( byteAt, 2, 2 ), 2U );
 }

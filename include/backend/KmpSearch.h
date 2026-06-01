@@ -22,8 +22,8 @@ class KmpSearch {
 public:
     /// A contiguous run of bytes (one resolved piece). @c data may be nullptr (skipped).
     struct Span {
-        const char* data;
-        uint64_t length;
+        const char* data___;
+        uint64_t length_h_h_;
     };
 
     using ProgressFn = std::function<void( uint64_t done, uint64_t total )>;
@@ -47,9 +47,9 @@ public:
      * @param cancel Polled cooperatively; when set the search aborts and returns empty.
      * @return Ascending logical start positions of matches, or empty if canceled.
      */
-    [[nodiscard]] auto findAll( const std::vector<Span>& spans, uint64_t totalBytes,
-                                const std::string& pattern, bool matchCase, bool matchWord,
-                                const std::function<char( uint64_t )>& byteAt,
-                                const ProgressFn& progress,
-                                const std::atomic<bool>& cancel ) const -> std::vector<uint64_t>;
+    [[nodiscard]] static auto findAll( const std::vector<Span>& spans, uint64_t totalBytes,
+                                       const std::string& pattern, bool matchCase, bool matchWord,
+                                       const std::function<char( uint64_t )>& byteAt,
+                                       const ProgressFn& progress, const std::atomic<bool>& cancel )
+        -> std::vector<uint64_t>;
 };

@@ -127,8 +127,8 @@ public:
      * @param length Length of the range.
      * @return Vector of intersecting pieces.
      */
-    [[nodiscard]] auto getFragmentsInRange( uint64_t position,
-                                            uint64_t length ) const -> std::vector<Piece>;
+    [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const
+        -> std::vector<Piece>;
 
     /**
      * @brief Inserts text at the specified logical position.

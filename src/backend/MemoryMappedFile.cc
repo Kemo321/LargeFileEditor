@@ -22,7 +22,7 @@ MemoryMappedFile::MemoryMappedFile( const std::string& filePath )
     }
 
     size_ = static_cast<uint64_t>( statBuffer.st_size );
-    void* mapped = mmap( nullptr, size_, PROT_READ, MAP_PRIVATE, fd_, 0 );
+    const void* mapped = mmap( nullptr, size_, PROT_READ, MAP_PRIVATE, fd_, 0 );
     if( mapped == MAP_FAILED ) {
         data_ = nullptr;
         size_ = 0;

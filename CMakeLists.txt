@@ -125,17 +125,17 @@ if(ENABLE_COVERAGE)
       coverage
       # 1. Reset previous instrumentation data
       COMMAND ${_lcov} --directory ${CMAKE_BINARY_DIR} --zerocounters
-      # 2. Run all tests to emit fresh .gcda files
+      # 1. Run all tests to emit fresh .gcda files
       COMMAND ${_ctest_cmd}
-      # 3. Capture raw coverage
+      # 1. Capture raw coverage
       COMMAND ${_lcov} --directory ${CMAKE_BINARY_DIR} --capture --output-file
               ${CMAKE_BINARY_DIR}/coverage.info
-      # 4. Filter third-party / tests / system headers
+      # 1. Filter third-party / tests / system headers
       COMMAND
         ${_lcov} --remove ${CMAKE_BINARY_DIR}/coverage.info /usr/* */tests/*
         */googletest/* */extern/* --output-file
         ${CMAKE_BINARY_DIR}/coverage.filtered.info
-      # 5. Generate HTML dashboard
+      # 1. Generate HTML dashboard
       COMMAND ${GENHTML_PATH} ${CMAKE_BINARY_DIR}/coverage.filtered.info
               --output-directory ${CMAKE_BINARY_DIR}/coverage_report
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

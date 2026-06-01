@@ -75,9 +75,9 @@ private:
     // Document mutations: update (line, col), emit documentEdited, and return true if the table
     // was modified.
     auto handleBackspace( int& line, int& col ) -> bool;
-    auto handleDelete( int& line, int& col ) -> bool;
+    auto handleDelete( int line, int col ) -> bool;
     auto handleNewline( int& line, int& col ) -> bool;
-    auto insertPrintableText( const QString& text, int& line, int& col ) -> bool;
+    auto insertPrintableText( const QString& text, int line, int& col ) -> bool;
 
     CursorManager* cursor_;
     PieceTable* pieceTable_{ nullptr };

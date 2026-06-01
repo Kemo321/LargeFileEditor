@@ -46,7 +46,7 @@ TEST_F( MemoryMappedFileTest, NonexistentFileIsInvalid )
     MemoryMappedFile file( "definitely_nonexistent_file_xyz.txt" );
     EXPECT_FALSE( file.isValid() );
     EXPECT_EQ( file.data(), nullptr );
-    EXPECT_EQ( file.size(), 0u );
+    EXPECT_EQ( file.size(), 0U );
 }
 
 TEST_F( MemoryMappedFileTest, DefaultConstructedIsInvalid )

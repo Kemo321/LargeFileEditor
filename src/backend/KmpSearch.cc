@@ -30,7 +30,7 @@ auto KmpSearch::computeLPS( const std::string& pattern ) -> std::vector<int>
 auto KmpSearch::findAll( const std::vector<Span>& spans, uint64_t totalBytes,
                          const std::string& pattern, bool matchCase, bool matchWord,
                          const std::function<char( uint64_t )>& byteAt, const ProgressFn& progress,
-                         const std::atomic<bool>& cancel ) const -> std::vector<uint64_t>
+                         const std::atomic<bool>& cancel ) -> std::vector<uint64_t>
 {
     // Poll progress/cancel roughly every 1 MiB of scanned bytes.
     static constexpr uint64_t kScanProgressMask = ( 1ULL << 20 ) - 1;
@@ -51,12 +51,12 @@ auto KmpSearch::findAll( const std::vector<Span>& spans, uint64_t totalBytes,
     uint64_t logical_pos = 0;
 
     for( const auto& span : spans ) {
-        if( span.data == nullptr ) {
-            logical_pos += span.length;
+        if( span.data___ == nullptr ) {
+            logical_pos += span.length_h_h_;
             continue;
         }
 
-        for( uint64_t idx = 0; idx < span.length; ++idx ) {
+        for( uint64_t idx = 0; idx < span.length_h_h_; ++idx ) {
             if( ( logical_pos & kScanProgressMask ) == 0 ) {
                 if( cancel.load( std::memory_order_relaxed ) ) {
                     return {};
@@ -64,7 +64,7 @@ auto KmpSearch::findAll( const std::vector<Span>& spans, uint64_t totalBytes,
                 progress( logical_pos, totalBytes );
             }
 
-            char currentChar = span.data[idx];
+            char currentChar = span.data___[idx];
             char compareChar = matchCase ? currentChar
                                          : static_cast<char>( std::tolower(
                                                static_cast<unsigned char>( currentChar ) ) );

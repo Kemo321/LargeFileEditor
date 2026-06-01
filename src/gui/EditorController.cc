@@ -80,10 +80,12 @@ auto EditorController::moveCursorLeft( int& line, int& col ) -> void
         uint64_t lineStart = lineManager_->getLineOffset( line );
         while( col > 0 ) {
             std::string b = pieceTable_->getSubstr( lineStart + col, 1 );
-            if( b.empty() )
+            if( b.empty() ) {
                 break;
-            if( !Utf8Utils::isContinuationByte( static_cast<unsigned char>( b[0] ) ) )
+            }
+            if( !Utf8Utils::isContinuationByte( static_cast<unsigned char>( b[0] ) ) ) {
                 break;
+            }
             col--;
         }
     } else if( line > 0 ) {
@@ -137,10 +139,12 @@ auto EditorController::handleBackspace( int& line, int& col ) -> bool
     uint64_t lineStart = lineManager_->getLineOffset( line );
     while( check_col > 0 ) {
         std::string b = pieceTable_->getSubstr( lineStart + check_col, 1 );
-        if( b.empty() )
+        if( b.empty() ) {
             break;
-        if( !Utf8Utils::isContinuationByte( static_cast<unsigned char>( b[0] ) ) )
+        }
+        if( !Utf8Utils::isContinuationByte( static_cast<unsigned char>( b[0] ) ) ) {
             break;
+        }
         check_col--;
         bytes_to_remove++;
     }
@@ -155,7 +159,7 @@ auto EditorController::handleBackspace( int& line, int& col ) -> bool
     return true;
 }
 
-auto EditorController::handleDelete( int& line, int& col ) -> bool
+auto EditorController::handleDelete( int line, int col ) -> bool
 {
     uint64_t pos = logicalPosition( line, col );
     if( pos >= pieceTable_->size() ) {
@@ -182,7 +186,7 @@ auto EditorController::handleNewline( int& line, int& col ) -> bool
     return true;
 }
 
-auto EditorController::insertPrintableText( const QString& text, int& line, int& col ) -> bool
+auto EditorController::insertPrintableText( const QString& text, int line, int& col ) -> bool
 {
     uint64_t pos = logicalPosition( line, col );
     pieceTable_->insert( pos, text.toStdString() );

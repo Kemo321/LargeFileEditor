@@ -20,7 +20,7 @@ auto search( const std::string& text, const std::string& pattern, bool matchCase
 {
     KmpSearch searcher;
     std::vector<KmpSearch::Span> spans{ { text.data(), text.size() } };
-    return searcher.findAll(
+    return KmpSearch::findAll(
         spans, text.size(), pattern, matchCase, matchWord,
         [&text]( uint64_t pos ) { return text[pos]; }, []( uint64_t, uint64_t ) {}, kNeverCancel );
 }
@@ -66,7 +66,7 @@ TEST( KmpSearchTest, MatchStraddlingSpanBoundary )
     std::string whole = "abcabc";
     KmpSearch searcher;
     std::vector<KmpSearch::Span> spans{ { whole.data(), 3 }, { whole.data() + 3, 3 } };
-    auto result = searcher.findAll(
+    auto result = KmpSearch::findAll(
         spans, whole.size(), "cab", true, false, [&whole]( uint64_t pos ) { return whole[pos]; },
         []( uint64_t, uint64_t ) {}, kNeverCancel );
     EXPECT_EQ( result, ( std::vector<uint64_t>{ 2 } ) );
@@ -79,7 +79,7 @@ TEST( KmpSearchTest, NullSpanIsSkipped )
     KmpSearch searcher;
     std::vector<KmpSearch::Span> spans{ { nullptr, 5 }, { tail.data(), tail.size() } };
     auto byteAt = [&tail]( uint64_t pos ) { return pos >= 5 ? tail[pos - 5] : '\0'; };
-    auto result = searcher.findAll(
+    auto result = KmpSearch::findAll(
         spans, 5 + tail.size(), "abc", true, false, byteAt, []( uint64_t, uint64_t ) {},
         kNeverCancel );
     EXPECT_EQ( result, ( std::vector<uint64_t>{ 5 } ) );
@@ -91,7 +91,7 @@ TEST( KmpSearchTest, CancelReturnsEmpty )
     std::atomic<bool> cancel{ true };
     KmpSearch searcher;
     std::vector<KmpSearch::Span> spans{ { text.data(), text.size() } };
-    auto result = searcher.findAll(
+    auto result = KmpSearch::findAll(
         spans, text.size(), "a", true, false, [&text]( uint64_t pos ) { return text[pos]; },
         []( uint64_t, uint64_t ) {}, cancel );
     EXPECT_TRUE( result.empty() );

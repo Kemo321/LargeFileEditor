@@ -219,11 +219,12 @@ auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
     return false;
 }
 
-auto PieceTable::findAll( const std::string& pattern, bool matchCase,
-                          bool matchWord ) const -> std::vector<uint64_t>
+auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool matchWord ) const
+    -> std::vector<uint64_t>
 {
     static const std::atomic<bool> never{ false };
-    return findAllImpl( pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+    return findAllImpl(
+        pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
 }
 
 auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
@@ -240,7 +241,7 @@ auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool m
     }
 
     KmpSearch searcher;
-    return searcher.findAll(
+    return KmpSearch::findAll(
         spans, size(), pattern, matchCase, matchWord,
         [this]( uint64_t pos ) { return getSubstr( pos, 1 )[0]; }, progress, cancel );
 }
@@ -396,8 +397,8 @@ auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
     return *this;
 }
 
-auto PieceTable::getFragmentsInRange( uint64_t position,
-                                      uint64_t length ) const -> std::vector<Piece>
+auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
+    -> std::vector<Piece>
 {
     std::vector<Piece> fragments;
     if( length == 0 || position >= size() ) {

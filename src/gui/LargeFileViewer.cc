@@ -190,8 +190,8 @@ auto LargeFileViewer::refreshLineOffsets() -> void
     }
 
     ViewMetrics metrics = computeViewMetrics( font() );
-    int lineHeight = metrics.lineHeight;
-    int charWidth = metrics.charWidth;
+    int lineHeight = metrics.lineHeight_;
+    int charWidth = metrics.charWidth_;
     gutter_width_ =
         editor_layout::kGutterDigits * charWidth + editor_layout::kGutterTextPadding * 2;
 
@@ -248,8 +248,8 @@ auto LargeFileViewer::setCursorPosition( int line, int col ) -> void
 auto LargeFileViewer::scrollToCursor() -> void
 {
     ViewMetrics metrics = computeViewMetrics( font() );
-    int lineHeight = metrics.lineHeight;
-    int charWidth = metrics.charWidth;
+    int lineHeight = metrics.lineHeight_;
+    int charWidth = metrics.charWidth_;
 
     int currentScroll = verticalScrollBar()->value();
     int visibleLinesCount = viewport()->height() / lineHeight;
@@ -298,8 +298,7 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
     }
 
     ViewMetrics metrics = computeViewMetrics( font() );
-    int lineHeight = metrics.lineHeight;
-    int charWidth = metrics.charWidth;
+    int lineHeight = metrics.lineHeight_;
 
     int clickedLineOffset = static_cast<int>( event->position().y() ) / lineHeight;
     int targetLine = verticalScrollBar()->value() + clickedLineOffset;
@@ -310,6 +309,7 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
         int scrollXPx = horizontalScrollBar()->value();
         int totalPx = textX + scrollXPx;
 
+        int charWidth = metrics.charWidth_;
         int approx_col = totalPx / charWidth;
         if( approx_col < 0 ) {
             approx_col = 0;
@@ -332,27 +332,27 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
 auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
 {
     QPainter painter( viewport() );
-    gutter_width_ = editor_layout::kGutterDigits * computeViewMetrics( font() ).charWidth +
+    gutter_width_ = editor_layout::kGutterDigits * computeViewMetrics( font() ).charWidth_ +
                     editor_layout::kGutterTextPadding * 2;
 
     RenderContext ctx;
-    ctx.pieceTable = piece_table_;
-    ctx.lineManager = line_manager_.get();
-    ctx.startLine = verticalScrollBar()->value();
-    ctx.hScrollPx = horizontalScrollBar()->value();
-    ctx.gutterWidth = gutter_width_;
-    ctx.viewportSize = viewport()->size();
-    ctx.font = font();
-    ctx.cursorLine = cursor_->line();
-    ctx.cursorCol = cursor_->col();
-    ctx.cursorVisible = cursor_->isVisible();
-    ctx.hasFocus = hasFocus();
-    ctx.searchResults = &search_results_;
-    ctx.activeSearchIndex = active_search_index_;
-    ctx.searchLength = search_length_;
-    ctx.mockHighlights = &mock_highlight_words_;
-    ctx.renderBusy = render_busy_;
-    renderer_.paint( painter, event->rect(), ctx );
+    ctx.pieceTable_ = piece_table_;
+    ctx.lineManager_ = line_manager_.get();
+    ctx.startLine_ = verticalScrollBar()->value();
+    ctx.hScrollPx_ = horizontalScrollBar()->value();
+    ctx.gutterWidth_ = gutter_width_;
+    ctx.viewportSize_ = viewport()->size();
+    ctx.font_ = font();
+    ctx.cursorLine_ = cursor_->line();
+    ctx.cursorCol_ = cursor_->col();
+    ctx.cursorVisible_ = cursor_->isVisible();
+    ctx.hasFocus_ = hasFocus();
+    ctx.searchResults_ = &search_results_;
+    ctx.activeSearchIndex_ = active_search_index_;
+    ctx.searchLength_ = search_length_;
+    ctx.mockHighlights_ = &mock_highlight_words_;
+    ctx.renderBusy_ = render_busy_;
+    TextRenderer::paint( painter, event->rect(), ctx );
 }
 
 auto LargeFileViewer::wheelEvent( QWheelEvent* event ) -> void

@@ -106,15 +106,15 @@ auto BackgroundTaskManager::waitForReplace() -> void
 
 auto BackgroundTaskManager::onSaveFinished() -> void
 {
-    emit saveFinished( save_watcher_->result() );
+    emit this->saveFinished( save_watcher_->result() );
 }
 
 auto BackgroundTaskManager::onFindFinished() -> void
 {
-    emit findFinished( find_watcher_->result() );
+    emit this->findFinished( find_watcher_->result() );
 }
 
 auto BackgroundTaskManager::onReplaceFinished() -> void
 {
-    emit replaceFinished( replace_watcher_->result(), replace_canceled_ );
+    emit this->replaceFinished( replace_watcher_->result(), replace_canceled_ );
 }

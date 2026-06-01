@@ -28,11 +28,11 @@ TEST( HistoryManagerTest, UndoRedoRoundTrip )
 
     EXPECT_TRUE( history.canUndo() );
     ASSERT_TRUE( history.undo( live ) );
-    EXPECT_EQ( live[0].start_, 0u );  // restored to "0"
+    EXPECT_EQ( live[0].start_, 0U );  // restored to "0"
 
     EXPECT_TRUE( history.canRedo() );
     ASSERT_TRUE( history.redo( live ) );
-    EXPECT_EQ( live[0].start_, 1u );  // re-applied "1"
+    EXPECT_EQ( live[0].start_, 1U );  // re-applied "1"
 }
 
 TEST( HistoryManagerTest, UndoRedoOnEmptyReturnsFalse )
