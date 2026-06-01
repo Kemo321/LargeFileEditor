@@ -10,6 +10,7 @@
 #include <QScrollBar>
 #include <QStatusBar>
 #include <QTimer>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -75,8 +76,10 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
         cursor_pos_label_->setText( QString( "Line %1, Col %2" ).arg( line + 1 ).arg( col + 1 ) );
     } );
 
-    connect( viewer_, &LargeFileViewer::documentModified, this,
-             [this]() { setWindowModified( true ); } );
+    connect( viewer_, &LargeFileViewer::documentModified, this, [this]() {
+        setWindowModified( true );
+        updateUndoRedoState();
+    } );
 
     setWindowModified( false );
     updateWindowTitle();
@@ -152,6 +155,16 @@ auto MainWindow::createActions() -> void
     exit_act_->setShortcuts( QKeySequence::Quit );
     connect( exit_act_, &QAction::triggered, qApp, &QApplication::quit );
 
+    undo_act_ = new QAction( "&Undo", this );
+    undo_act_->setShortcuts( QKeySequence::Undo );
+    undo_act_->setEnabled( false );
+    connect( undo_act_, &QAction::triggered, this, &MainWindow::undoText );
+
+    redo_act_ = new QAction( "&Redo", this );
+    redo_act_->setShortcuts( QKeySequence::Redo );
+    redo_act_->setEnabled( false );
+    connect( redo_act_, &QAction::triggered, this, &MainWindow::redoText );
+
     find_act_ = new QAction( "&Find...", this );
     find_act_->setShortcuts( QKeySequence::Find );
     connect( find_act_, &QAction::triggered, this, &MainWindow::findText );
@@ -190,6 +203,9 @@ auto MainWindow::createMenus() -> void
     fileMenu->addAction( exit_act_ );
 
     QMenu* editMenu = menuBar()->addMenu( "&Edit" );
+    editMenu->addAction( undo_act_ );
+    editMenu->addAction( redo_act_ );
+    editMenu->addSeparator();
     editMenu->addAction( find_act_ );
     editMenu->addAction( replace_act_ );
 
@@ -228,6 +244,46 @@ auto MainWindow::updateWindowTitle() -> void
         setWindowFilePath( current_filename_ );
         QString displayName = QFileInfo( current_filename_ ).fileName();
         setWindowTitle( QString( "[*]%1 - LargeFileEditor" ).arg( displayName ) );
+    }
+}
+
+auto MainWindow::undoText() -> void
+{
+    if( !piece_table_ ) {
+        return;
+    }
+    if( std::optional<uint64_t> restoredOffset = piece_table_->undo() ) {
+        viewer_->refreshView();
+        // Recenter the view and cursor on the reverted edit so the change is never off-screen.
+        viewer_->jumpToLogicalPosition( *restoredOffset );
+        setWindowModified( piece_table_->isDirty() );
+        updateUndoRedoState();
+        task_status_label_->setText( "Undo successful" );
+    }
+}
+
+auto MainWindow::redoText() -> void
+{
+    if( !piece_table_ ) {
+        return;
+    }
+    if( std::optional<uint64_t> restoredOffset = piece_table_->redo() ) {
+        viewer_->refreshView();
+        viewer_->jumpToLogicalPosition( *restoredOffset );
+        setWindowModified( piece_table_->isDirty() );
+        updateUndoRedoState();
+        task_status_label_->setText( "Redo successful" );
+    }
+}
+
+auto MainWindow::updateUndoRedoState() -> void
+{
+    if( piece_table_ ) {
+        undo_act_->setEnabled( piece_table_->canUndo() );
+        redo_act_->setEnabled( piece_table_->canRedo() );
+    } else {
+        undo_act_->setEnabled( false );
+        redo_act_->setEnabled( false );
     }
 }
 
@@ -276,6 +332,7 @@ auto MainWindow::openFile() -> void
             viewer_->setEnabled( false );
             setWindowModified( false );
             updateWindowTitle();
+            updateUndoRedoState();
             return;
         }
 
@@ -295,6 +352,7 @@ auto MainWindow::openFile() -> void
             updateWindowTitle();
             task_status_label_->setText(
                 QString( "Loaded: %1" ).arg( QFileInfo( fileName ).fileName() ) );
+            updateUndoRedoState();
         } catch( ... ) {
             task_status_label_->setText( "Error: Failed to open file" );
             QMessageBox::critical( this, "Error", "Could not open the file." );
@@ -358,6 +416,7 @@ auto MainWindow::onSaveFinished( bool success ) -> void
         viewer_->setPieceTable( piece_table_.get() );
         viewer_->verticalScrollBar()->setValue( currentScroll );
 
+        updateUndoRedoState();
         setWindowModified( false );
         task_status_label_->setText( "File saved successfully" );
     } else {

@@ -5,12 +5,12 @@
 static constexpr size_t kMaxUndoHistory = 100;
 static constexpr uint64_t kMaxUndoBytes = 256ULL * 1024ULL * 1024ULL;
 
-void HistoryManager::recordState( const Snapshot& current )
+void HistoryManager::recordState( const std::vector<Piece>& current, uint64_t cursorOffset )
 {
     if( isBatchOperation_ ) {
         return;
     }
-    undoStack_.push_back( current );
+    undoStack_.push_back( { current, cursorOffset } );
     redoStack_.clear();
 
     if( undoStack_.size() > kMaxUndoHistory ) {
@@ -24,35 +24,39 @@ void HistoryManager::recordState( const Snapshot& current )
     uint64_t undoBytes = std::accumulate(
         undoStack_.begin(), undoStack_.end(), 0ULL,
         []( uint64_t acc, const Snapshot& snapshot ) -> uint64_t {
-            return acc + ( static_cast<uint64_t>( snapshot.size() ) * sizeof( Piece ) );
+            return acc + ( static_cast<uint64_t>( snapshot.pieces_.size() ) * sizeof( Piece ) );
         } );
 
     while( undoStack_.size() > 1 && undoBytes > kMaxUndoBytes ) {
-        undoBytes -= static_cast<uint64_t>( undoStack_.front().size() ) * sizeof( Piece );
+        undoBytes -= static_cast<uint64_t>( undoStack_.front().pieces_.size() ) * sizeof( Piece );
         undoStack_.erase( undoStack_.begin() );
     }
 }
 
-auto HistoryManager::undo( Snapshot& current ) -> bool
+auto HistoryManager::undo( std::vector<Piece>& current ) -> std::optional<uint64_t>
 {
     if( undoStack_.empty() ) {
-        return false;
+        return std::nullopt;
     }
-    redoStack_.push_back( current );
-    current = undoStack_.back();
+    Snapshot restored = std::move( undoStack_.back() );
     undoStack_.pop_back();
-    return true;
+    // The restored snapshot carries the offset of the edit that produced it; reuse that same
+    // offset for the live state pushed onto the redo stack so a later redo focuses identically.
+    redoStack_.push_back( { std::move( current ), restored.cursorOffset_ } );
+    current = std::move( restored.pieces_ );
+    return restored.cursorOffset_;
 }
 
-auto HistoryManager::redo( Snapshot& current ) -> bool
+auto HistoryManager::redo( std::vector<Piece>& current ) -> std::optional<uint64_t>
 {
     if( redoStack_.empty() ) {
-        return false;
+        return std::nullopt;
     }
-    undoStack_.push_back( current );
-    current = redoStack_.back();
+    Snapshot restored = std::move( redoStack_.back() );
     redoStack_.pop_back();
-    return true;
+    undoStack_.push_back( { std::move( current ), restored.cursorOffset_ } );
+    current = std::move( restored.pieces_ );
+    return restored.cursorOffset_;
 }
 
 auto HistoryManager::canUndo() const -> bool

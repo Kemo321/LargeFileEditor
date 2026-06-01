@@ -68,6 +68,12 @@ private:
     auto updateWindowTitle() -> void;
     auto processFindResults() -> void;
 
+    auto undoText() -> void;
+    auto redoText() -> void;
+    // Re-evaluates the enabled state of undo_act_/redo_act_ from the backend history (canUndo/
+    // canRedo); force-disables both when no document is loaded.
+    auto updateUndoRedoState() -> void;
+
     // Defers window close until a running background save completes: ignores the event, disables
     // the UI, and shows a waiting status. The close is re-issued from onSaveFinished().
     auto beginCloseWait( QCloseEvent* event ) -> void;
@@ -89,6 +95,9 @@ private:
     QAction* save_act_{};
     QAction* save_as_act_{};
     QAction* exit_act_{};
+
+    QAction* undo_act_{};
+    QAction* redo_act_{};
 
     QAction* find_act_{};
     QAction* replace_act_{};
