@@ -31,7 +31,9 @@ public:
     MemoryMappedFile( const MemoryMappedFile& ) = delete;
     auto operator=( const MemoryMappedFile& ) -> MemoryMappedFile& = delete;
 
+    /// Move constructor: takes over @p other's mapping, leaving it invalid.
     MemoryMappedFile( MemoryMappedFile&& other ) noexcept;
+    /// Move assignment: releases the current mapping and takes over @p other's.
     auto operator=( MemoryMappedFile&& other ) noexcept -> MemoryMappedFile&;
 
     /**

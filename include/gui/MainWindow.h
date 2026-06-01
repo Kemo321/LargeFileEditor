@@ -39,6 +39,7 @@ public:
     ~MainWindow() override;
 
 protected:
+    /// Prompts to save unsaved changes (and defers close during a running save).
     auto closeEvent( QCloseEvent* event ) -> void override;
 
 private:

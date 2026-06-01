@@ -256,7 +256,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
 
 auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement,
                              bool matchCase, bool matchWord,
-                             const std::function<void( uint64_t, uint64_t )>& progress,
+                             const std::function<void( uint64_t done, uint64_t total )>& progress,
                              const std::atomic<bool>& cancel ) -> uint64_t
 {
     static constexpr uint64_t kProgressStride = 4096;

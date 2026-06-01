@@ -22,10 +22,11 @@ class KmpSearch {
 public:
     /// A contiguous run of bytes (one resolved piece). @c data may be nullptr (skipped).
     struct Span {
-        const char* data___;
-        uint64_t length_h_h_;
+        const char* data___;   ///< Start of the run, or nullptr to only advance position.
+        uint64_t length_h_h_;  ///< Byte length of the run.
     };
 
+    /// Progress callback receiving (bytes scanned, total bytes).
     using ProgressFn = std::function<void( uint64_t done, uint64_t total )>;
 
     /**

@@ -47,7 +47,9 @@ public:
     PieceTable( const PieceTable& ) = delete;
     auto operator=( const PieceTable& ) -> PieceTable& = delete;
 
+    /// Move constructor: transfers @p other's buffers, pieces and history.
     PieceTable( PieceTable&& other ) noexcept;
+    /// Move assignment: transfers @p other's state, leaving it empty.
     auto operator=( PieceTable&& other ) noexcept -> PieceTable&;
 
     /**

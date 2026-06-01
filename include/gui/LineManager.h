@@ -14,6 +14,7 @@ class PieceTable;
  */
 class LineManager {
 public:
+    /// Binds to @p pt; lines longer than @p max_visual_line_length are hard-wrapped.
     explicit LineManager( PieceTable* pt, int max_visual_line_length = 4096 );
 
     /**

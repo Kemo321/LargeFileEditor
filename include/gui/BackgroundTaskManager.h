@@ -25,6 +25,7 @@ class BackgroundTaskManager : public QObject {
     Q_OBJECT
 
 public:
+    /// Constructs the manager and its QFutureWatchers.
     explicit BackgroundTaskManager( QObject* parent = nullptr );
 
     /// Saves @p table to @p tempPath on a worker thread; emits @ref saveFinished.
@@ -39,8 +40,11 @@ public:
     auto startReplaceAll( PieceTable* table, const QString& findText, const QString& replaceText,
                           bool matchCase, bool matchWord ) -> void;
 
+    /// True while a background save is running.
     [[nodiscard]] auto isSaveRunning() const -> bool;
+    /// True while a background search is running.
     [[nodiscard]] auto isFindRunning() const -> bool;
+    /// True while a background Replace All is running.
     [[nodiscard]] auto isReplaceRunning() const -> bool;
 
     /// Requests cancellation of a running Replace All (flag delivered via @ref replaceFinished).

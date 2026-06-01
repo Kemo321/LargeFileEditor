@@ -24,8 +24,8 @@ public:
      *        refocus when this state is restored (same value drives both undo and redo jumps).
      */
     struct Snapshot {
-        std::vector<Piece> pieces_;
-        uint64_t cursorOffset_{ 0 };
+        std::vector<Piece> pieces_;   ///< Piece sequence of this document state.
+        uint64_t cursorOffset_{ 0 };  ///< Byte offset to refocus on restore.
     };
 
     /**
@@ -52,7 +52,9 @@ public:
      */
     [[nodiscard]] auto redo( std::vector<Piece>& current ) -> std::optional<uint64_t>;
 
+    /// True if an undo is available.
     [[nodiscard]] auto canUndo() const -> bool;
+    /// True if a redo is available.
     [[nodiscard]] auto canRedo() const -> bool;
 
     /// True if the document changed since the last @ref markSaved.
@@ -63,6 +65,7 @@ public:
 
     /// Suppresses @ref recordState while a multi-step batch operation runs.
     void setBatchOperation( bool on );
+    /// True while a batch operation is suppressing recording.
     [[nodiscard]] auto isBatchOperation() const -> bool;
 
 private:

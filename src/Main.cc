@@ -8,6 +8,7 @@
 
 #include "gui/MainWindow.h"
 
+/// Application entry point: starts the Qt event loop with the main window shown.
 auto main( int argc, char* argv[] ) -> int
 {
     QApplication app( argc, argv );
