@@ -1,6 +1,6 @@
 /**
  * @file PieceTableTest.cc
- * @author Tomasz Okon
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Unit tests for the PieceTable backend logic.
  */
 #include <gtest/gtest.h>
@@ -399,8 +399,7 @@ TEST_F( PieceTableTest, FindAllNonOverlappingMatches )
 {
     PieceTable pieceTable( createTempFile( "ANANA" ) );
 
-    // Non-overlapping semantics: scanning resumes after the consumed match,
-    // so "ANA" matches once at 0 (the candidate at 2 overlaps and is skipped).
+    // Non-overlapping: "ANA" matches once at 0; the candidate at 2 overlaps and is skipped.
     auto results = pieceTable.findAll( "ANA" );
     ASSERT_EQ( results.size(), 1 );
     EXPECT_EQ( results[0], 0 );
@@ -430,8 +429,7 @@ TEST_F( PieceTableTest, FindAllKMPMismatchFallbackInsideSearch )
     PieceTable pieceTable( createTempFile( "AABAACAADAABAABA" ) );
 
     auto results = pieceTable.findAll( "AABA" );
-    // Non-overlapping: matches at 0 and 9; the candidate at 12 overlaps the
-    // match consumed at 9 (9 + 4 = 13 > 12) and is skipped.
+    // Non-overlapping: matches at 0 and 9; candidate at 12 overlaps (9+4=13>12) and is skipped.
     ASSERT_EQ( results.size(), 2 );
     EXPECT_EQ( results[0], 0 );
     EXPECT_EQ( results[1], 9 );
@@ -524,7 +522,7 @@ TEST_F( PieceTableTest, ReplaceAllConsecutiveOccurrences )
 TEST_F( PieceTableTest, ReplaceAllMassiveFragmentation )
 {
     PieceTable pieceTable;
-    for( int idx = 0; idx < 5; idx++ ) {
+    for( int idx = 0; idx < 5; ++idx ) {
         pieceTable.insert( pieceTable.size(), "A " );
     }
 
@@ -536,8 +534,7 @@ TEST_F( PieceTableTest, ReplaceAllMassiveFragmentation )
 
 TEST_F( PieceTableTest, ReplaceAllNonOverlappingPattern )
 {
-    // Previously overlapping matches ("ttt" at 0 and 1) corrupted replaceAll.
-    // Non-overlapping semantics make this safe: one match, no exception.
+    // Non-overlapping: "ttt" matches once at 0 (regression guard against overlap corruption).
     PieceTable pieceTable( createTempFile( "tttt" ) );
     uint64_t count = pieceTable.replaceAll( "ttt", "x" );
 
@@ -547,8 +544,7 @@ TEST_F( PieceTableTest, ReplaceAllNonOverlappingPattern )
 
 TEST_F( PieceTableTest, ReplaceAllReplacementContainsPattern )
 {
-    // Replacement contains the pattern; matches come from one pre-scan of the
-    // old text, so there is no runaway re-scan/growth.
+    // Replacement contains the pattern; one pre-scan of the old text avoids runaway growth.
     PieceTable pieceTable( createTempFile( "aaa" ) );
     uint64_t count = pieceTable.replaceAll( "a", "aa" );
 
@@ -566,7 +562,7 @@ TEST_F( PieceTableTest, ReplaceAllCancelRollsBack )
         "cat", "X", true, false, []( uint64_t, uint64_t ) {}, cancel );
 
     EXPECT_EQ( count, 0 );
-    EXPECT_EQ( pieceTable.getText(), original );  // rolled back, unchanged
+    EXPECT_EQ( pieceTable.getText(), original );  // rolled back
     EXPECT_FALSE( pieceTable.canUndo() );         // no state committed
 }
 
@@ -633,7 +629,7 @@ TEST_F( PieceTableTest, HistorySizeLimitEnforcement )
 
     int successfulUndos = 0;
     while( testTable.undo() ) {
-        successfulUndos++;
+        ++successfulUndos;
     }
 
     EXPECT_EQ( successfulUndos, 100 );
@@ -733,8 +729,7 @@ TEST_F( PieceTableTest, MoveSemanticsTransferOwnership )
 
 TEST_F( PieceTableTest, CachedSizeStaysConsistentAcrossMutations )
 {
-    // size() is cached (O(1)); it must equal getText().size() after every mutation,
-    // including the snapshot swaps in undo/redo and the transactional replaceAll commit.
+    // size() is cached; it must equal getText().size() after every mutation (incl. undo/redo).
     PieceTable pieceTable( createTempFile( "the cat sat on the mat" ) );
     EXPECT_EQ( pieceTable.size(), pieceTable.getText().size() );
 
@@ -762,10 +757,9 @@ TEST_F( PieceTableTest, CachedSizeStaysConsistentAcrossMutations )
 
 TEST_F( PieceTableTest, ReplaceAllCoalescesFragmentedTable )
 {
-    // Build a fragmented table out of many small inserts, then replaceAll. The defrag
-    // pass must preserve the exact text and the cached size regardless of piece merging.
+    // replaceAll on a fragmented table: the defrag pass must preserve text and cached size.
     PieceTable pieceTable;
-    for( int idx = 0; idx < 6; idx++ ) {
+    for( int idx = 0; idx < 6; ++idx ) {
         pieceTable.insert( pieceTable.size(), "ab " );
     }
     ASSERT_EQ( pieceTable.getText(), "ab ab ab ab ab ab " );
@@ -784,11 +778,10 @@ TEST_F( PieceTableTest, ReplaceAllCoalescesFragmentedTable )
 
 TEST_F( PieceTableTest, FindPieceAtBinarySearchRoundTrip )
 {
-    // O(log n) findPieceAt: across a heavily fragmented table, getSubstr (which routes through
-    // findPieceAt + the cumulative-offset index) must agree with a flat getText() for every
-    // position, length, and piece boundary.
+    // getSubstr (via findPieceAt) must agree with a flat getText() at every pos/len on a
+    // fragmented table.
     PieceTable pieceTable( createTempFile( "0123456789" ) );
-    for( int idx = 0; idx < 12; idx++ ) {
+    for( int idx = 0; idx < 12; ++idx ) {
         // Interleave inserts at varied positions to splinter the table into many pieces.
         pieceTable.insert( static_cast<uint64_t>( idx ) % ( pieceTable.size() + 1 ),
                            "<" + std::to_string( idx ) + ">" );
@@ -816,9 +809,7 @@ TEST_F( PieceTableTest, FindPieceAtBoundaryAndOutOfRange )
     const uint64_t end = pieceTable.size();
     // position == size(): findPieceAt returns the past-the-end sentinel; a zero-length read is "".
     EXPECT_EQ( pieceTable.getSubstr( end, 0 ), "" );
-    // Last byte is still reachable.
     EXPECT_EQ( pieceTable.getSubstr( end - 1, 1 ), pieceTable.getText().substr( end - 1, 1 ) );
-    // Reading past the end throws.
     EXPECT_THROW( pieceTable.getSubstr( end, 1 ), std::out_of_range );
     EXPECT_THROW( pieceTable.getSubstr( end + 5, 1 ), std::out_of_range );
 }

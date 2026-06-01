@@ -1,5 +1,6 @@
 /**
  * @file CursorManager.h
+ * @author Jan Szwagierczak
  * @brief Cursor coordinate and blink/visibility state for the editor viewport.
  */
 
@@ -19,14 +20,18 @@ class CursorManager : public QObject {
     Q_OBJECT
 
 public:
+    /// Constructs the cursor and starts its blink timer.
     explicit CursorManager( QObject* parent = nullptr );
 
+    /// Current cursor line.
     [[nodiscard]] auto line() const -> int;
+    /// Current cursor column.
     [[nodiscard]] auto col() const -> int;
 
     /// Sets the cursor coordinates verbatim (no clamping).
     auto setPosition( int line, int col ) -> void;
 
+    /// Whether the caret is currently visible.
     [[nodiscard]] auto isVisible() const -> bool;
 
     /// Forces the cursor visible (e.g. right after a move or edit).
@@ -34,6 +39,7 @@ public:
 
     /// Resumes/suspends the blink animation.
     auto startBlink() -> void;
+    /// Stops the blink animation.
     auto stopBlink() -> void;
 
 signals:

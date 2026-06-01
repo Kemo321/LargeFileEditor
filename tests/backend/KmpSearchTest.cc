@@ -1,5 +1,6 @@
 /**
  * @file KmpSearchTest.cc
+ * @author Tomasz Okon
  * @brief Unit tests for the standalone KmpSearch matcher.
  */
 #include <gtest/gtest.h>

@@ -1,5 +1,6 @@
 /**
  * @file LineManagerTest.cc
+ * @author Jan Szwagierczak
  * @brief Headless unit tests for LineManager: virtual-line mapping, hard soft-wrap, cache
  *        invalidation and UTF-8 chunk snapping.
  */

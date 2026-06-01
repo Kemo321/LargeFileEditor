@@ -1,5 +1,6 @@
 /**
  * @file KmpSearch.h
+ * @author Tomasz Okon
  * @brief Knuth-Morris-Pratt substring search over a sequence of memory spans.
  */
 
@@ -15,17 +16,18 @@
  * @class KmpSearch
  * @brief Stateless KMP matcher operating on the raw buffers behind a piece sequence.
  *
- * Decoupled from PieceTable: callers resolve their pieces into ordered @ref Span values and
- * supply a random-access byte accessor for whole-word boundary checks.
+ * Callers resolve their pieces into ordered @ref Span values and supply a byte accessor for
+ * whole-word boundary checks.
  */
 class KmpSearch {
 public:
     /// A contiguous run of bytes (one resolved piece). @c data may be nullptr (skipped).
     struct Span {
-        const char* data___;
-        uint64_t length_h_h_;
+        const char* data___;   ///< Start of the run, or nullptr to only advance position.
+        uint64_t length_h_h_;  ///< Byte length of the run.
     };
 
+    /// Progress callback receiving (bytes scanned, total bytes).
     using ProgressFn = std::function<void( uint64_t done, uint64_t total )>;
 
     /**

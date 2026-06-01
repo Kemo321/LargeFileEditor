@@ -1,5 +1,6 @@
 /**
  * @file CursorManagerTest.cc
+ * @author Jan Szwagierczak
  * @brief Headless unit tests for CursorManager: position state, visibility, and the blink signal.
  */
 #include <gtest/gtest.h>
@@ -32,7 +33,7 @@ TEST_F( CursorManagerTest, PositionState )
 TEST_F( CursorManagerTest, VisibilityToggle )
 {
     CursorManager cursor;
-    EXPECT_TRUE( cursor.isVisible() );  // visible by default
+    EXPECT_TRUE( cursor.isVisible() );
 
     cursor.setVisible( false );
     EXPECT_FALSE( cursor.isVisible() );

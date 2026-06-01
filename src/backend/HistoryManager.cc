@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "backend/HistoryManager.h"
 
 #include <numeric>
@@ -17,10 +19,7 @@ void HistoryManager::recordState( const std::vector<Piece>& current, uint64_t cu
         undoStack_.erase( undoStack_.begin() );
     }
 
-    // Memory guard: snapshots are full copies of the piece list, which can hold millions of
-    // entries after a large replaceAll. Cap total undo memory by evicting oldest snapshots
-    // (keeping at least the most recent) so editing a heavily fragmented document cannot
-    // exhaust RAM.
+    // Memory guard: cap total undo bytes by evicting oldest snapshots (keep at least one).
     uint64_t undoBytes = std::accumulate(
         undoStack_.begin(), undoStack_.end(), 0ULL,
         []( uint64_t acc, const Snapshot& snapshot ) -> uint64_t {
@@ -40,8 +39,7 @@ auto HistoryManager::undo( std::vector<Piece>& current ) -> std::optional<uint64
     }
     Snapshot restored = std::move( undoStack_.back() );
     undoStack_.pop_back();
-    // The restored snapshot carries the offset of the edit that produced it; reuse that same
-    // offset for the live state pushed onto the redo stack so a later redo focuses identically.
+    // Reuse the edit offset for the redo entry so a later redo refocuses identically.
     redoStack_.push_back( { std::move( current ), restored.cursorOffset_ } );
     current = std::move( restored.pieces_ );
     return restored.cursorOffset_;

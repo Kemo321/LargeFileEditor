@@ -1,5 +1,6 @@
 /**
  * @file HistoryManagerTest.cc
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Unit tests for the HistoryManager undo/redo stacks.
  */
 #include <gtest/gtest.h>
@@ -112,9 +113,8 @@ TEST( HistoryManagerTest, BatchOperationSuppressesRecord )
 
 TEST( HistoryManagerTest, MemoryCapEviction )
 {
-    // The manager caps total undo memory at 256 MiB by evicting the oldest snapshots, always
-    // keeping at least the most recent. Each snapshot here weighs ~64 MiB, so six of them
-    // (~384 MiB if all retained) must force eviction down to the cap.
+    // Undo memory is capped at 256 MiB by evicting oldest snapshots (keeping >=1). Six ~64 MiB
+    // snapshots (~384 MiB) must force eviction down to the cap.
     constexpr uint64_t kMaxUndoBytes = 256ULL * 1024ULL * 1024ULL;
     const uint64_t snapshotBytes = 64ULL * 1024ULL * 1024ULL;
     const auto piecesPerSnapshot = static_cast<size_t>( snapshotBytes / sizeof( Piece ) );
@@ -127,11 +127,9 @@ TEST( HistoryManagerTest, MemoryCapEviction )
         history.recordState( live, static_cast<uint64_t>( i ) );
     }
 
-    // The most recent state survived the eviction sweep.
-    EXPECT_TRUE( history.canUndo() );
+    EXPECT_TRUE( history.canUndo() );  // most recent state survived eviction
 
-    // Drain the undo stack to count how many snapshots were actually retained. Each undo merely
-    // moves a snapshot onto the redo stack, so peak memory stays bounded by the retained set.
+    // Drain the undo stack to count retained snapshots.
     std::vector<Piece> scratch;
     int retained = 0;
     while( history.undo( scratch ).has_value() ) {
@@ -141,8 +139,7 @@ TEST( HistoryManagerTest, MemoryCapEviction )
     EXPECT_GE( retained, 1 );        // never evict the last surviving state
     EXPECT_LT( retained, kPushes );  // oldest snapshots were dropped
 
-    // The retained aggregate respects the memory cap (with >= 2 survivors the sweep always
-    // finishes at or below the limit).
+    // Retained aggregate respects the memory cap.
     EXPECT_LE( static_cast<uint64_t>( retained ) * piecesPerSnapshot * sizeof( Piece ),
                kMaxUndoBytes );
 }

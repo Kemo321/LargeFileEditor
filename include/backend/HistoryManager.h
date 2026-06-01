@@ -1,5 +1,6 @@
 /**
  * @file HistoryManager.h
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Undo/redo snapshot stacks and dirty-state tracking for the PieceTable.
  */
 
@@ -15,29 +16,23 @@
  * @class HistoryManager
  * @brief Owns the undo/redo history of piece-list snapshots and the save/dirty bookkeeping.
  *
- * The PieceTable hands its current piece list to @ref recordState before each mutation and
- * swaps it through @ref undo / @ref redo, keeping all history policy (count cap, memory cap,
- * batch suppression) in one place.
+ * Centralizes history policy (count cap, memory cap, batch suppression) for the PieceTable.
  */
 class HistoryManager {
 public:
     /**
-     * @brief A historical document state: the piece sequence plus the cursor byte offset that
-     *        should regain focus when this state is restored.
-     *
-     * The @ref cursorOffset_ describes the edit transition that produced the state, so the same
-     * value drives the cursor jump whether the state is reached by undo or by redo.
+     * @brief A historical document state: the piece sequence plus the cursor byte offset to
+     *        refocus when this state is restored (same value drives both undo and redo jumps).
      */
     struct Snapshot {
-        std::vector<Piece> pieces_;
-        uint64_t cursorOffset_{ 0 };
+        std::vector<Piece> pieces_;   ///< Piece sequence of this document state.
+        uint64_t cursorOffset_{ 0 };  ///< Byte offset to refocus on restore.
     };
 
     /**
      * @brief Records @p current as an undo point and clears the redo stack.
      *
-     * No-op while a batch operation is in progress. Evicts oldest snapshots to respect the
-     * count and total-memory caps (always keeping at least the most recent).
+     * No-op during a batch operation. Evicts oldest snapshots to respect the count/memory caps.
      *
      * @param current The pre-mutation piece list to snapshot.
      * @param cursorOffset Logical byte offset of the edit, restored on undo/redo.
@@ -58,7 +53,9 @@ public:
      */
     [[nodiscard]] auto redo( std::vector<Piece>& current ) -> std::optional<uint64_t>;
 
+    /// True if an undo is available.
     [[nodiscard]] auto canUndo() const -> bool;
+    /// True if a redo is available.
     [[nodiscard]] auto canRedo() const -> bool;
 
     /// True if the document changed since the last @ref markSaved.
@@ -69,6 +66,7 @@ public:
 
     /// Suppresses @ref recordState while a multi-step batch operation runs.
     void setBatchOperation( bool on );
+    /// True while a batch operation is suppressing recording.
     [[nodiscard]] auto isBatchOperation() const -> bool;
 
 private:

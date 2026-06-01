@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "gui/BackgroundTaskManager.h"
 
 #include <QPromise>

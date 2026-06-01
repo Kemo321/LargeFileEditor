@@ -40,9 +40,12 @@ public:
     auto showReplace() -> void;
 
 signals:
+    /// Requests finding the next occurrence of @p text.
     auto findNextRequested( const QString& text, bool matchCase, bool matchWord ) -> void;
+    /// Requests replacing the current match, then finding the next.
     auto replaceNextRequested( const QString& findText, const QString& replaceText, bool matchCase,
                                bool matchWord ) -> void;
+    /// Requests replacing every occurrence.
     auto replaceAllRequested( const QString& findText, const QString& replaceText, bool matchCase,
                               bool matchWord ) -> void;
     /**
@@ -56,6 +59,7 @@ protected:
      * @param event The hide event.
      */
     auto hideEvent( QHideEvent* event ) -> void override;
+    /// Starts a frameless-window drag on left-button press.
     auto mousePressEvent( QMouseEvent* event ) -> void override;
 
 private:

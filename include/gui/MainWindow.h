@@ -39,6 +39,7 @@ public:
     ~MainWindow() override;
 
 protected:
+    /// Prompts to save unsaved changes (and defers close during a running save).
     auto closeEvent( QCloseEvent* event ) -> void override;
 
 private:
@@ -70,16 +71,13 @@ private:
 
     auto undoText() -> void;
     auto redoText() -> void;
-    // Re-evaluates the enabled state of undo_act_/redo_act_ from the backend history (canUndo/
-    // canRedo); force-disables both when no document is loaded.
+    // Syncs undo_act_/redo_act_ enabled state with backend history (disabled when no document).
     auto updateUndoRedoState() -> void;
 
-    // Defers window close until a running background save completes: ignores the event, disables
-    // the UI, and shows a waiting status. The close is re-issued from onSaveFinished().
+    // Defers window close until a running save completes; re-issued from onSaveFinished().
     auto beginCloseWait( QCloseEvent* event ) -> void;
 
-    // Completes a deferred close once a save has finished: re-issues close() on success, or
-    // restores the UI if the save failed (document still modified). No-op when no close pending.
+    // Completes a deferred close: re-issues close() on save success, restores the UI on failure.
     auto finalizePendingClose() -> void;
 
     LargeFileViewer* viewer_;

@@ -9,11 +9,13 @@ class PieceTable;
 
 /**
  * @class LineManager
+ * @author Jan Szwagierczak
  * @brief Maps "Virtual Line Numbers" to "Global Byte Offsets" for the PieceTable.
  * Implements "Hard Soft-Wrap" to avoid freezing on extremely long lines.
  */
 class LineManager {
 public:
+    /// Binds to @p pt; lines longer than @p max_visual_line_length are hard-wrapped.
     explicit LineManager( PieceTable* pt, int max_visual_line_length = 4096 );
 
     /**
@@ -30,7 +32,7 @@ public:
 
     /**
      * @brief Gets the estimated total number of virtual lines.
-     * For uncalculated portions, it estimates based on average line lengauto
+     * Uncalculated portions are estimated from the average line length.
      */
     auto getLineCount() -> int;
 
@@ -45,7 +47,7 @@ public:
     void reset();
 
     /**
-     * @brief Helper to get the length of a virtual linautoes.
+     * @brief Helper to get the length of a virtual line.
      */
     auto getVirtualLineLength( int virtual_line ) -> uint64_t;
 

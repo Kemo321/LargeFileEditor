@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "gui/LargeFileViewer.h"
 
 #include <QCursor>
@@ -158,7 +160,7 @@ auto LargeFileViewer::onScrollbarMoved( int value ) -> void
     QScrollBar* vBar = verticalScrollBar();
     if( vBar->maximum() > 0 ) {
         double percent = ( static_cast<double>( value ) / vBar->maximum() ) * 100.0;
-        QString tip = QString( "Line: %1\n%2%" ).arg( value + 1 ).arg( percent, 0, 'f', 1 );
+        QString tip = QString( "Wiersz: %1\n%2%" ).arg( value + 1 ).arg( percent, 0, 'f', 1 );
 
         if( scrollbar_tooltip_ != nullptr ) {
             scrollbar_tooltip_->setText( tip );

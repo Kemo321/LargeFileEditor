@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "util/Utf8Utils.h"
 
 namespace Utf8Utils {
@@ -30,7 +32,7 @@ auto snapToCharacterBoundary( const std::function<unsigned char( uint64_t )>& by
         if( !isContinuationByte( byte ) ) {
             return position - backOffset;
         }
-        backOffset++;
+        ++backOffset;
     }
     return position;
 }

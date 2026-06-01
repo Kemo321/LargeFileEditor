@@ -1,5 +1,6 @@
 /**
  * @file EditorControllerTest.cc
+ * @author Jan Szwagierczak
  * @brief Headless unit tests for EditorController: bounded navigation, UTF-8-aware cursor motion
  *        and multibyte-safe deletion.
  */

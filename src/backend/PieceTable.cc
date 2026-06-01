@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "backend/PieceTable.h"
 
 #include <algorithm>
@@ -103,7 +105,7 @@ auto PieceTable::getSubstr( uint64_t position, uint64_t length ) const -> std::s
         result.append( bufferPtr + piece.start_ + offset, toCopy );
         remaining -= toCopy;
         offset = 0;
-        index++;
+        ++index;
     }
     return result;
 }
@@ -158,7 +160,7 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
         auto res = findPieceAt( position );
         if( res.offsetInPiece_ > 0 ) {
             splitPiece( res.pieceIndex_, res.offsetInPiece_ );
-            res.pieceIndex_++;
+            ++res.pieceIndex_;
         }
         pieces_.insert( pieces_.begin() + static_cast<std::ptrdiff_t>( res.pieceIndex_ ),
                         { BufferType::Add, startInAdd, textLength } );
@@ -184,7 +186,7 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
     auto startRes = findPieceAt( position );
     if( startRes.offsetInPiece_ > 0 ) {
         splitPiece( startRes.pieceIndex_, startRes.offsetInPiece_ );
-        startRes.pieceIndex_++;
+        ++startRes.pieceIndex_;
     }
 
     uint64_t removedSoFar = 0;
@@ -256,7 +258,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
 
 auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement,
                              bool matchCase, bool matchWord,
-                             const std::function<void( uint64_t, uint64_t )>& progress,
+                             const std::function<void( uint64_t done, uint64_t total )>& progress,
                              const std::atomic<bool>& cancel ) -> uint64_t
 {
     static constexpr uint64_t kProgressStride = 4096;
@@ -265,8 +267,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
         return 0;
     }
 
-    // The whole operation is two byte-sized passes (scan + merge); report progress over
-    // 2 * totalBytes so the bar climbs monotonically 0->100% across both phases.
+    // Two passes (scan + merge); report over 2 * totalBytes so the bar climbs 0->100% once.
     const uint64_t totalBytes = size();
     const uint64_t progressSpan = 2 * totalBytes;
     auto scanProgress = [&progress, progressSpan]( uint64_t bytesScanned, uint64_t /*total*/ ) {
@@ -286,8 +287,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
     std::vector<Piece> newPieces;
     newPieces.reserve( pieces_.size() + 2 * occurrences.size() );
 
-    // Forward-only cursor over the old pieces_ (occurrences are ascending and
-    // non-overlapping, so the cursor is never rewound).
+    // Forward-only cursor over old pieces_ (ascending non-overlapping occurrences, never rewound).
     size_t srcIdx = 0;
     uint64_t srcOff = 0;
     uint64_t cursor = 0;
@@ -325,8 +325,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
         }
         advance( occ + patternLen, false );  // skip the matched source bytes
         if( ( ++done % kProgressStride ) == 0 ) {
-            // Merge occupies the second half of the bar; also refreshes the cancel bridge.
-            progress( totalBytes + cursor, progressSpan );
+            progress( totalBytes + cursor, progressSpan );  // merge phase = second half of bar
         }
     }
     advance( totalBytes, true );  // copy the tail (pieces_ not yet mutated, so size == totalBytes)
@@ -358,8 +357,7 @@ auto PieceTable::undo() -> std::optional<uint64_t>
         return std::nullopt;
     }
     rebuildOffsetIndex();
-    // Clamp: a contracting edit can shrink the document below the recorded offset; never hand
-    // the view a position past EOF.
+    // Clamp: a contracting edit can shrink the document below the recorded offset (past EOF).
     return std::min( *offset, total_size_ );
 }
 
@@ -422,7 +420,7 @@ auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
 
         remaining -= toTake;
         offset = 0;
-        index++;
+        ++index;
     }
     return fragments;
 }

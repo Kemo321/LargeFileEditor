@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "gui/MainWindow.h"
 
 #include <QApplication>
@@ -50,7 +52,7 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
         current_match_case_ = true;
         current_match_word_ = false;
         viewer_->setSearchHighlights( {}, -1, 0 );
-        task_status_label_->setText( "Ready" );
+        task_status_label_->setText( "Gotowy" );
     } );
 
     createActions();
@@ -68,12 +70,12 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     connect( cancel_task_btn_, &QPushButton::clicked, this, [this]() {
         if( tasks_->isReplaceRunning() ) {
             tasks_->cancelReplace();
-            task_status_label_->setText( "Canceling..." );
+            task_status_label_->setText( "Anulowanie..." );
         }
     } );
 
     connect( viewer_, &LargeFileViewer::cursorPositionChanged, this, [this]( int line, int col ) {
-        cursor_pos_label_->setText( QString( "Line %1, Col %2" ).arg( line + 1 ).arg( col + 1 ) );
+        cursor_pos_label_->setText( QString( "Wiersz %1, Kol %2" ).arg( line + 1 ).arg( col + 1 ) );
     } );
 
     connect( viewer_, &LargeFileViewer::documentModified, this, [this]() {
@@ -94,8 +96,7 @@ MainWindow::~MainWindow()
 
 auto MainWindow::closeEvent( QCloseEvent* event ) -> void
 {
-    // A save kicked off earlier (or by the prompt below) is still running: never block the GUI
-    // thread waiting for it — defer the close until onSaveFinished() re-issues it.
+    // A running save must not block the GUI thread; defer the close until onSaveFinished().
     if( tasks_->isSaveRunning() ) {
         beginCloseWait( event );
         return;
@@ -107,15 +108,15 @@ auto MainWindow::closeEvent( QCloseEvent* event ) -> void
     }
 
     QMessageBox msgBox(
-        QMessageBox::Warning, "Unsaved Changes",
-        "The document has been modified. Do you want to save your changes before closing?",
+        QMessageBox::Warning, "Niezapisane zmiany",
+        "Dokument został zmodyfikowany. Czy chcesz zapisać zmiany przed zamknięciem?",
         QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this );
     msgBox.setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint );
 
     int reply = msgBox.exec();
 
     if( reply == QMessageBox::Save ) {
-        saveFile();  // asynchronous: starts a background save if possible
+        saveFile();  // asynchronous background save
         if( tasks_->isSaveRunning() ) {
             beginCloseWait( event );
         } else {
@@ -134,48 +135,48 @@ auto MainWindow::beginCloseWait( QCloseEvent* event ) -> void
     close_after_save_ = true;
     viewer_->setEnabled( false );
     menuBar()->setEnabled( false );
-    task_status_label_->setText( "Closing, waiting for save operation to finish..." );
+    task_status_label_->setText( "Zamykanie, oczekiwanie na zakończenie zapisu..." );
 }
 
 auto MainWindow::createActions() -> void
 {
-    open_act_ = new QAction( "&Open...", this );
+    open_act_ = new QAction( "&Otwórz...", this );
     open_act_->setShortcuts( QKeySequence::Open );
     connect( open_act_, &QAction::triggered, this, &MainWindow::openFile );
 
-    save_act_ = new QAction( "&Save", this );
+    save_act_ = new QAction( "&Zapisz", this );
     save_act_->setShortcuts( QKeySequence::Save );
     connect( save_act_, &QAction::triggered, this, &MainWindow::saveFile );
 
-    save_as_act_ = new QAction( "Save &As...", this );
+    save_as_act_ = new QAction( "Zapisz &jako...", this );
     save_as_act_->setShortcuts( QKeySequence::SaveAs );
     connect( save_as_act_, &QAction::triggered, this, &MainWindow::saveFileAs );
 
-    exit_act_ = new QAction( "E&xit", this );
+    exit_act_ = new QAction( "Za&kończ", this );
     exit_act_->setShortcuts( QKeySequence::Quit );
     connect( exit_act_, &QAction::triggered, qApp, &QApplication::quit );
 
-    undo_act_ = new QAction( "&Undo", this );
+    undo_act_ = new QAction( "&Cofnij", this );
     undo_act_->setShortcuts( QKeySequence::Undo );
     undo_act_->setEnabled( false );
     connect( undo_act_, &QAction::triggered, this, &MainWindow::undoText );
 
-    redo_act_ = new QAction( "&Redo", this );
+    redo_act_ = new QAction( "&Ponów", this );
     redo_act_->setShortcuts( QKeySequence::Redo );
     redo_act_->setEnabled( false );
     connect( redo_act_, &QAction::triggered, this, &MainWindow::redoText );
 
-    find_act_ = new QAction( "&Find...", this );
+    find_act_ = new QAction( "&Znajdź...", this );
     find_act_->setShortcuts( QKeySequence::Find );
     connect( find_act_, &QAction::triggered, this, &MainWindow::findText );
 
-    replace_act_ = new QAction( "&Replace...", this );
+    replace_act_ = new QAction( "Za&mień...", this );
     replace_act_->setShortcuts( QKeySequence::Replace );
     connect( replace_act_, &QAction::triggered, this, &MainWindow::replaceText );
 
-    font_small_act_ = new QAction( "Small", this );
-    font_medium_act_ = new QAction( "Medium", this );
-    font_large_act_ = new QAction( "Large", this );
+    font_small_act_ = new QAction( "Mała", this );
+    font_medium_act_ = new QAction( "Średnia", this );
+    font_large_act_ = new QAction( "Duża", this );
 
     font_small_act_->setCheckable( true );
     font_medium_act_->setCheckable( true );
@@ -195,22 +196,22 @@ auto MainWindow::createActions() -> void
 
 auto MainWindow::createMenus() -> void
 {
-    QMenu* fileMenu = menuBar()->addMenu( "&File" );
+    QMenu* fileMenu = menuBar()->addMenu( "&Plik" );
     fileMenu->addAction( open_act_ );
     fileMenu->addAction( save_act_ );
     fileMenu->addAction( save_as_act_ );
     fileMenu->addSeparator();
     fileMenu->addAction( exit_act_ );
 
-    QMenu* editMenu = menuBar()->addMenu( "&Edit" );
+    QMenu* editMenu = menuBar()->addMenu( "&Edycja" );
     editMenu->addAction( undo_act_ );
     editMenu->addAction( redo_act_ );
     editMenu->addSeparator();
     editMenu->addAction( find_act_ );
     editMenu->addAction( replace_act_ );
 
-    QMenu* viewMenu = menuBar()->addMenu( "&View" );
-    QMenu* fontSizeMenu = viewMenu->addMenu( "Font Size" );
+    QMenu* viewMenu = menuBar()->addMenu( "&Widok" );
+    QMenu* fontSizeMenu = viewMenu->addMenu( "Rozmiar czcionki" );
     fontSizeMenu->addAction( font_small_act_ );
     fontSizeMenu->addAction( font_medium_act_ );
     fontSizeMenu->addAction( font_large_act_ );
@@ -223,16 +224,16 @@ auto MainWindow::createStatusBar() -> void
     task_progress_bar_->setMaximumHeight( kProgressBarHeight );
     task_progress_bar_->hide();
 
-    cancel_task_btn_ = new QPushButton( "Cancel", this );
+    cancel_task_btn_ = new QPushButton( "Anuluj", this );
     cancel_task_btn_->hide();
 
-    task_status_label_ = new QLabel( "Ready", this );
+    task_status_label_ = new QLabel( "Gotowy", this );
 
     statusBar()->addWidget( task_status_label_ );
     statusBar()->addWidget( task_progress_bar_ );
     statusBar()->addWidget( cancel_task_btn_ );
 
-    cursor_pos_label_ = new QLabel( "Line 1, Col 1", this );
+    cursor_pos_label_ = new QLabel( "Wiersz 1, Kol 1", this );
     statusBar()->addPermanentWidget( cursor_pos_label_ );
 }
 
@@ -254,11 +255,11 @@ auto MainWindow::undoText() -> void
     }
     if( std::optional<uint64_t> restoredOffset = piece_table_->undo() ) {
         viewer_->refreshView();
-        // Recenter the view and cursor on the reverted edit so the change is never off-screen.
+        // Recenter on the reverted edit so the change is never off-screen.
         viewer_->jumpToLogicalPosition( *restoredOffset );
         setWindowModified( piece_table_->isDirty() );
         updateUndoRedoState();
-        task_status_label_->setText( "Undo successful" );
+        task_status_label_->setText( "Cofanie zakończone pomyślnie" );
     }
 }
 
@@ -272,7 +273,7 @@ auto MainWindow::redoText() -> void
         viewer_->jumpToLogicalPosition( *restoredOffset );
         setWindowModified( piece_table_->isDirty() );
         updateUndoRedoState();
-        task_status_label_->setText( "Redo successful" );
+        task_status_label_->setText( "Ponawianie zakończone pomyślnie" );
     }
 }
 
@@ -290,19 +291,19 @@ auto MainWindow::updateUndoRedoState() -> void
 auto MainWindow::setFontSizeSmall() -> void
 {
     viewer_->setFont( QFont( viewer_->font().family(), kFontSizeSmall ) );
-    task_status_label_->setText( "Font size set to Small" );
+    task_status_label_->setText( "Ustawiono małą czcionkę" );
 }
 
 auto MainWindow::setFontSizeMedium() -> void
 {
     viewer_->setFont( QFont( viewer_->font().family(), kFontSizeMedium ) );
-    task_status_label_->setText( "Font size set to Medium" );
+    task_status_label_->setText( "Ustawiono średnią czcionkę" );
 }
 
 auto MainWindow::setFontSizeLarge() -> void
 {
     viewer_->setFont( QFont( viewer_->font().family(), kFontSizeLarge ) );
-    task_status_label_->setText( "Font size set to Large" );
+    task_status_label_->setText( "Ustawiono dużą czcionkę" );
 }
 
 auto MainWindow::openFile() -> void
@@ -310,17 +311,18 @@ auto MainWindow::openFile() -> void
     if( tasks_->isReplaceRunning() ) {
         return;
     }
-    QString fileName = QFileDialog::getOpenFileName( this, "Open File", "", "All Files (*)" );
+    QString fileName =
+        QFileDialog::getOpenFileName( this, "Otwórz plik", "", "Wszystkie pliki (*)" );
     if( !fileName.isEmpty() ) {
-        task_status_label_->setText( "Opening file..." );
+        task_status_label_->setText( "Otwieranie pliku..." );
         task_progress_bar_->show();
         task_progress_bar_->setRange( 0, 0 );
 
         if( FileUtils::isBinaryFile( fileName ) ) {
             task_progress_bar_->hide();
-            task_status_label_->setText( "Unsupported file type: Binary" );
-            QMessageBox::warning( this, "Unsupported File",
-                                  "Unsupported file type: Binary files are not supported." );
+            task_status_label_->setText( "Nieobsługiwany typ pliku: binarny" );
+            QMessageBox::warning( this, "Nieobsługiwany plik",
+                                  "Nieobsługiwany typ pliku: pliki binarne nie są obsługiwane." );
             current_filename_ = "";
             current_find_text_ = "";
             current_find_index_ = -1;
@@ -351,11 +353,11 @@ auto MainWindow::openFile() -> void
             setWindowModified( false );
             updateWindowTitle();
             task_status_label_->setText(
-                QString( "Loaded: %1" ).arg( QFileInfo( fileName ).fileName() ) );
+                QString( "Wczytano: %1" ).arg( QFileInfo( fileName ).fileName() ) );
             updateUndoRedoState();
         } catch( ... ) {
-            task_status_label_->setText( "Error: Failed to open file" );
-            QMessageBox::critical( this, "Error", "Could not open the file." );
+            task_status_label_->setText( "Błąd: nie udało się otworzyć pliku" );
+            QMessageBox::critical( this, "Błąd", "Nie można otworzyć pliku." );
         }
 
         task_progress_bar_->hide();
@@ -378,7 +380,7 @@ auto MainWindow::saveFile() -> void
 
     task_progress_bar_->show();
     task_progress_bar_->setRange( 0, 0 );
-    task_status_label_->setText( "Saving in background..." );
+    task_status_label_->setText( "Zapisywanie w tle..." );
 
     pending_temp_filename_ = current_filename_ + ".tmp";
 
@@ -402,9 +404,10 @@ auto MainWindow::onSaveFinished( bool success ) -> void
 
         if( !QFile::rename( pending_temp_filename_, current_filename_ ) ) {
             QFile::rename( backup_filename, current_filename_ );
-            task_status_label_->setText( "Save error: Rename failed" );
-            QMessageBox::critical( this, "Save Error",
-                                   "Could not save the file: Rename failed from temp file." );
+            task_status_label_->setText( "Błąd zapisu: zmiana nazwy nie powiodła się" );
+            QMessageBox::critical(
+                this, "Błąd zapisu",
+                "Nie można zapisać pliku: zmiana nazwy pliku tymczasowego nie powiodła się." );
             finalizePendingClose();
             return;
         }
@@ -418,16 +421,17 @@ auto MainWindow::onSaveFinished( bool success ) -> void
 
         updateUndoRedoState();
         setWindowModified( false );
-        task_status_label_->setText( "File saved successfully" );
+        task_status_label_->setText( "Plik zapisany pomyślnie" );
     } else {
-        task_status_label_->setText( "Critical: Save failed" );
-        QMessageBox::critical( this, "Save Error",
-                               "Could not save the file: Backend piece table write failed." );
+        task_status_label_->setText( "Krytyczny: zapis nie powiódł się" );
+        QMessageBox::critical(
+            this, "Błąd zapisu",
+            "Nie można zapisać pliku: zapis tablicy fragmentów nie powiódł się." );
     }
 
     QTimer::singleShot( kStatusClearDelayMs, this, [this]() {
-        if( task_status_label_->text().contains( "successfully" ) ) {
-            task_status_label_->setText( "Ready" );
+        if( task_status_label_->text().contains( "zapisany pomyślnie" ) ) {
+            task_status_label_->setText( "Gotowy" );
         }
     } );
 
@@ -441,13 +445,13 @@ auto MainWindow::finalizePendingClose() -> void
     }
 
     if( isWindowModified() ) {
-        // Save failed: abandon the close and restore the UI so the user can react.
+        // Save failed: abandon the close and restore the UI.
         close_after_save_ = false;
         menuBar()->setEnabled( true );
         return;
     }
 
-    close();  // re-enters closeEvent, which now accepts (no save running, not modified)
+    close();  // re-enters closeEvent, which now accepts
 }
 
 auto MainWindow::saveFileAs() -> void
@@ -456,20 +460,22 @@ auto MainWindow::saveFileAs() -> void
         return;
     }
 
-    QString fileName = QFileDialog::getSaveFileName( this, "Save File As", "", "All Files (*)" );
+    QString fileName =
+        QFileDialog::getSaveFileName( this, "Zapisz plik jako", "", "Wszystkie pliki (*)" );
     if( !fileName.isEmpty() ) {
-        task_status_label_->setText( "Saving as..." );
+        task_status_label_->setText( "Zapisywanie jako..." );
         if( piece_table_->saveToFile( fileName.toStdString() ) ) {
             tasks_->waitForSave();
 
             current_filename_ = fileName;
             setWindowModified( false );
             updateWindowTitle();
-            task_status_label_->setText( "File saved as: " + QFileInfo( fileName ).fileName() );
+            task_status_label_->setText( "Plik zapisany jako: " +
+                                         QFileInfo( fileName ).fileName() );
         } else {
-            task_status_label_->setText( "Save As failed!" );
-            QMessageBox::critical( this, "Save Error",
-                                   "Could not save the file: Backend write failed." );
+            task_status_label_->setText( "Zapisywanie jako nie powiodło się!" );
+            QMessageBox::critical( this, "Błąd zapisu",
+                                   "Nie można zapisać pliku: zapis w backendzie nie powiódł się." );
         }
     }
 }
@@ -477,13 +483,13 @@ auto MainWindow::saveFileAs() -> void
 auto MainWindow::findText() -> void
 {
     find_replace_dialog_->showFind();
-    task_status_label_->setText( "Find dialog opened" );
+    task_status_label_->setText( "Otwarto okno wyszukiwania" );
 }
 
 auto MainWindow::replaceText() -> void
 {
     find_replace_dialog_->showReplace();
-    task_status_label_->setText( "Replace dialog opened" );
+    task_status_label_->setText( "Otwarto okno zamiany" );
 }
 
 auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool matchWord ) -> void
@@ -500,7 +506,7 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
 
         task_progress_bar_->show();
         task_progress_bar_->setRange( 0, 0 );
-        task_status_label_->setText( "Searching..." );
+        task_status_label_->setText( "Wyszukiwanie..." );
 
         viewer_->setEnabled( false );
 
@@ -522,15 +528,16 @@ auto MainWindow::onFindFinished( std::vector<uint64_t> results ) -> void
 auto MainWindow::processFindResults() -> void
 {
     if( current_find_results_.empty() ) {
-        task_status_label_->setText( QString( "No matches for '%1'" ).arg( current_find_text_ ) );
-        QMessageBox::information( find_replace_dialog_, "Find", "Text not found." );
+        task_status_label_->setText(
+            QString( "Brak dopasowań dla '%1'" ).arg( current_find_text_ ) );
+        QMessageBox::information( find_replace_dialog_, "Znajdź", "Nie znaleziono tekstu." );
         return;
     }
 
-    current_find_index_++;
+    ++current_find_index_;
     if( current_find_index_ >= static_cast<int>( current_find_results_.size() ) ) {
         current_find_index_ = 0;
-        task_status_label_->setText( "Search wrapped to top" );
+        task_status_label_->setText( "Wyszukiwanie zawinięte na początek" );
     }
 
     uint64_t targetPos = current_find_results_[current_find_index_];
@@ -539,7 +546,7 @@ auto MainWindow::processFindResults() -> void
     viewer_->setSearchHighlights( current_find_results_, current_find_index_,
                                   current_find_text_.length() );
 
-    task_status_label_->setText( QString( "Match %1 of %2" )
+    task_status_label_->setText( QString( "Dopasowanie %1 z %2" )
                                      .arg( current_find_index_ + 1 )
                                      .arg( current_find_results_.size() ) );
 }
@@ -565,7 +572,7 @@ auto MainWindow::onReplaceNextRequested( const QString& findText, const QString&
 
     viewer_->refreshView();
     setWindowModified( true );
-    task_status_label_->setText( "Occurrence replaced" );
+    task_status_label_->setText( "Zamieniono wystąpienie" );
 
     int offsetShift = replaceTextLen - findTextLen;
     for( size_t idx = current_find_index_ + 1; idx < current_find_results_.size(); ++idx ) {
@@ -573,7 +580,7 @@ auto MainWindow::onReplaceNextRequested( const QString& findText, const QString&
     }
 
     current_find_results_.erase( current_find_results_.begin() + current_find_index_ );
-    current_find_index_--;  // Adjust index because we removed the current item
+    --current_find_index_;  // removed the current item
 
     viewer_->setSearchHighlights( current_find_results_, current_find_index_ + 1,
                                   current_find_text_.length() );
@@ -597,7 +604,7 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
     task_progress_bar_->setRange( 0, 100 );
     task_progress_bar_->setValue( 0 );
     cancel_task_btn_->show();
-    task_status_label_->setText( "Replacing..." );
+    task_status_label_->setText( "Zamienianie..." );
 
     tasks_->startReplaceAll( piece_table_.get(), findText, replaceText, matchCase, matchWord );
 }
@@ -607,7 +614,7 @@ auto MainWindow::onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -
     task_progress_bar_->hide();
     cancel_task_btn_->hide();
     viewer_->setEnabled( true );
-    viewer_->setBusy( false );  // re-enable rendering before any refreshView/paint
+    viewer_->setBusy( false );  // re-enable rendering before any paint
     save_act_->setEnabled( true );
     open_act_->setEnabled( true );
 
@@ -619,7 +626,7 @@ auto MainWindow::onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -
     const uint64_t replaced = replacedCount;
 
     if( canceled ) {
-        task_status_label_->setText( "Replace All canceled" );
+        task_status_label_->setText( "Zamiana wszystkich anulowana" );
         if( replaced > 0 ) {  // rare: cancel arrived after the commit
             viewer_->refreshView();
             setWindowModified( true );
@@ -631,9 +638,9 @@ auto MainWindow::onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -
         viewer_->refreshView();
         setWindowModified( true );
         task_status_label_->setText(
-            QString( "Successfully replaced %1 occurrences" ).arg( replaced ) );
+            QString( "Pomyślnie zamieniono %1 wystąpień" ).arg( replaced ) );
     } else {
-        task_status_label_->setText( "Replace All: No matches found" );
-        QMessageBox::information( this, "Replace All", "Text not found." );
+        task_status_label_->setText( "Zamień wszystko: brak dopasowań" );
+        QMessageBox::information( this, "Zamień wszystko", "Nie znaleziono tekstu." );
     }
 }

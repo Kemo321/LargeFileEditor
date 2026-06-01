@@ -90,8 +90,8 @@ public:
     /**
      * @brief Suspends/resumes rendering while a background task mutates the backend.
      *
-     * While busy the viewer must not read the PieceTable (a worker thread owns it),
-     * so painting and line-offset refreshes are skipped and the cursor blink is paused.
+     * While busy a worker thread owns the PieceTable, so painting, line-offset refreshes and
+     * cursor blink are paused.
      * @param busy True to suspend rendering, false to resume.
      */
     auto setBusy( bool busy ) -> void;

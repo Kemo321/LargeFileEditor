@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "util/FileUtils.h"
 
 #include <QByteArray>
@@ -33,13 +35,13 @@ auto isBinaryFile( const QString& filePath ) -> bool
     for( char i : chunk ) {
         auto uc = static_cast<unsigned char>( i );
         if( uc == '\0' ) {
-            nullBytes++;
+            ++nullBytes;
         } else if( uc < kControlByteThreshold ) {
             if( uc != '\t' && uc != '\n' && uc != '\r' ) {
-                controlCount++;
+                ++controlCount;
             }
         } else if( uc == kDeleteByte ) {
-            controlCount++;
+            ++controlCount;
         }
     }
 
@@ -52,14 +54,14 @@ auto isBinaryFile( const QString& filePath ) -> bool
     while( i < chunk.size() ) {
         auto b1 = static_cast<unsigned char>( chunk.at( i ) );
         if( b1 < 128 ) {
-            i++;
+            ++i;
             continue;
         }
 
         int seq_len = Utf8Utils::sequenceLength( b1 );
         if( seq_len == 1 ) {
-            invalidUtf8Count++;
-            i++;
+            ++invalidUtf8Count;
+            ++i;
             continue;
         }
 
@@ -77,8 +79,8 @@ auto isBinaryFile( const QString& filePath ) -> bool
         }
 
         if( !valid_seq ) {
-            invalidUtf8Count++;
-            i++;
+            ++invalidUtf8Count;
+            ++i;
         } else {
             i += seq_len;
         }

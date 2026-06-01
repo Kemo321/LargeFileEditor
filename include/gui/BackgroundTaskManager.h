@@ -1,5 +1,6 @@
 /**
  * @file BackgroundTaskManager.h
+ * @author Jan Szwagierczak
  * @brief Orchestrates the asynchronous save/find/replace tasks for the editor.
  */
 
@@ -17,15 +18,15 @@ class PieceTable;
  * @class BackgroundTaskManager
  * @brief Owns the QtConcurrent workers and QFutureWatchers for long-running operations.
  *
- * Keeps the threading/cancellation plumbing out of @ref MainWindow, which only reacts to the
- * Qt-typed result signals to update UI state. The PieceTable is owned by the caller; while a task
- * runs the worker thread holds the raw pointer, so the caller must keep it alive (and must not read
- * it) until the matching finished signal fires.
+ * Keeps threading/cancellation plumbing out of @ref MainWindow. The caller-owned PieceTable is
+ * held by the worker thread while a task runs, so the caller must keep it alive and not read it
+ * until the matching finished signal fires.
  */
 class BackgroundTaskManager : public QObject {
     Q_OBJECT
 
 public:
+    /// Constructs the manager and its QFutureWatchers.
     explicit BackgroundTaskManager( QObject* parent = nullptr );
 
     /// Saves @p table to @p tempPath on a worker thread; emits @ref saveFinished.
@@ -40,8 +41,11 @@ public:
     auto startReplaceAll( PieceTable* table, const QString& findText, const QString& replaceText,
                           bool matchCase, bool matchWord ) -> void;
 
+    /// True while a background save is running.
     [[nodiscard]] auto isSaveRunning() const -> bool;
+    /// True while a background search is running.
     [[nodiscard]] auto isFindRunning() const -> bool;
+    /// True while a background Replace All is running.
     [[nodiscard]] auto isReplaceRunning() const -> bool;
 
     /// Requests cancellation of a running Replace All (flag delivered via @ref replaceFinished).

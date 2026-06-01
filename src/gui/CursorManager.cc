@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "gui/CursorManager.h"
 
 static constexpr int kCursorBlinkRateMs = 500;
