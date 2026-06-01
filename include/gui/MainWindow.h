@@ -8,18 +8,18 @@
 
 #include <QAction>
 #include <QActionGroup>
-#include <QFutureWatcher>
 #include <QLabel>
 #include <QMainWindow>
 #include <QMenu>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QString>
-#include <QtConcurrent/QtConcurrent>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
 #include "backend/PieceTable.h"
+#include "gui/BackgroundTaskManager.h"
 #include "gui/FindReplaceDialog.h"
 #include "gui/LargeFileViewer.h"
 
@@ -54,9 +54,9 @@ private:
     auto onReplaceAllRequested( const QString& findText, const QString& replaceText, bool matchCase,
                                 bool matchWord ) -> void;
 
-    auto onSaveFinished() -> void;
-    auto onFindFinished() -> void;
-    auto onReplaceAllFinished() -> void;
+    auto onSaveFinished( bool success ) -> void;
+    auto onFindFinished( std::vector<uint64_t> results ) -> void;
+    auto onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -> void;
 
     auto setFontSizeSmall() -> void;
     auto setFontSizeMedium() -> void;
@@ -67,7 +67,14 @@ private:
     auto createStatusBar() -> void;
     auto updateWindowTitle() -> void;
     auto processFindResults() -> void;
-    static auto isBinaryFile( const QString& filePath ) -> bool;
+
+    // Defers window close until a running background save completes: ignores the event, disables
+    // the UI, and shows a waiting status. The close is re-issued from onSaveFinished().
+    auto beginCloseWait( QCloseEvent* event ) -> void;
+
+    // Completes a deferred close once a save has finished: re-issues close() on success, or
+    // restores the UI if the save failed (document still modified). No-op when no close pending.
+    auto finalizePendingClose() -> void;
 
     LargeFileViewer* viewer_;
     FindReplaceDialog* find_replace_dialog_{};
@@ -99,9 +106,8 @@ private:
     int current_find_index_{ -1 };
     bool current_match_case_{ true };
     bool current_match_word_{ false };
-    bool replace_canceled_{ false };
 
-    QFutureWatcher<bool>* save_watcher_{};
-    QFutureWatcher<std::vector<uint64_t>>* find_watcher_{};
-    QFutureWatcher<uint64_t>* replace_watcher_{};
+    BackgroundTaskManager* tasks_{};
+
+    bool close_after_save_{ false };
 };

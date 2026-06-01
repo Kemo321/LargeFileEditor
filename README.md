@@ -21,4 +21,4 @@ A high-performance GUI text editor designed to handle files exceeding available 
 Ensure your Ubuntu 24.04 system has the necessary packages:
 ```bash
 sudo apt update
-sudo apt install build-essential cmake qt6-base-dev libgtest-dev
+sudo apt install build-essential cmake qt6-base-dev libgtest-dev lcov

@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "backend/PieceTable.h"
+#include "util/Utf8Utils.h"
 
 LineManager::LineManager( PieceTable* pt, int max_visual_line_length )
     : pt_( pt ), max_visual_line_length_( max_visual_line_length )
@@ -232,46 +233,29 @@ auto LineManager::getLineChunk( int virtual_line, uint64_t start_col, uint64_t l
     uint64_t line_start = getLineOffset( virtual_line );
     uint64_t chunk_start = line_start + start_col;
 
+    auto byteAt = [this]( uint64_t pos ) {
+        return static_cast<unsigned char>( pt_->getSubstr( pos, 1 )[0] );
+    };
+
     // UTF-8 backward snapping for start
     if( actual_length > 0 && chunk_start > line_start ) {
-        int back_offset = 0;
-        while( back_offset < 4 && chunk_start >= line_start + back_offset ) {
-            std::string b = pt_->getSubstr( chunk_start - back_offset, 1 );
-            if( b.empty() ) {
-                break;
-            }
-            auto byte = static_cast<unsigned char>( b[0] );
-            if( ( byte & 0xC0 ) != 0x80 ) {
-                chunk_start -= back_offset;
-                actual_length += back_offset;
-                break;
-            }
-            back_offset++;
-        }
+        uint64_t snapped = Utf8Utils::snapToCharacterBoundary( byteAt, line_start, chunk_start );
+        actual_length += chunk_start - snapped;
+        chunk_start = snapped;
     }
 
     std::string chunk = pt_->getSubstr( chunk_start, actual_length );
 
     // UTF-8 forward snapping for end
     if( chunk_start + actual_length < line_start + line_len ) {
-        std::string next_b = pt_->getSubstr( chunk_start + actual_length, 1 );
-        if( !next_b.empty() ) {
-            auto byte = static_cast<unsigned char>( next_b[0] );
-            if( ( byte & 0xC0 ) == 0x80 ) {
-                int extra = 0;
-                while( extra < 4 && chunk_start + actual_length + extra < line_start + line_len ) {
-                    std::string b = pt_->getSubstr( chunk_start + actual_length + extra, 1 );
-                    if( b.empty() ) {
-                        break;
-                    }
-                    auto check_byte = static_cast<unsigned char>( b[0] );
-                    if( ( check_byte & 0xC0 ) != 0x80 ) {
-                        break;
-                    }
-                    extra++;
-                }
-                chunk += pt_->getSubstr( chunk_start + actual_length, extra );
+        uint64_t tail = chunk_start + actual_length;
+        if( Utf8Utils::isContinuationByte( byteAt( tail ) ) ) {
+            int extra = 0;
+            while( extra < Utf8Utils::kMaxSequenceLength && tail + extra < line_start + line_len &&
+                   Utf8Utils::isContinuationByte( byteAt( tail + extra ) ) ) {
+                extra++;
             }
+            chunk += pt_->getSubstr( tail, extra );
         }
     }
 

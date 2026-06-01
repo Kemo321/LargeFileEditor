@@ -71,6 +71,11 @@ cmake-build-*/
 *.tmp
 *.bak
 
+# --- Coverage (LCOV) ---
+build-coverage/
+*.info
+*.gcda
+*.gcno
 coverage.css
 coverage.functions.html
 coverage.html
