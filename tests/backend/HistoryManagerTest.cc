@@ -4,6 +4,7 @@
  */
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <vector>
 
 #include "backend/HistoryManager.h"
@@ -107,4 +108,41 @@ TEST( HistoryManagerTest, BatchOperationSuppressesRecord )
     history.setBatchOperation( false );
     history.recordState( live, 0 );
     EXPECT_TRUE( history.canUndo() );
+}
+
+TEST( HistoryManagerTest, MemoryCapEviction )
+{
+    // The manager caps total undo memory at 256 MiB by evicting the oldest snapshots, always
+    // keeping at least the most recent. Each snapshot here weighs ~64 MiB, so six of them
+    // (~384 MiB if all retained) must force eviction down to the cap.
+    constexpr uint64_t kMaxUndoBytes = 256ULL * 1024ULL * 1024ULL;
+    const uint64_t snapshotBytes = 64ULL * 1024ULL * 1024ULL;
+    const size_t piecesPerSnapshot = static_cast<size_t>( snapshotBytes / sizeof( Piece ) );
+    constexpr int kPushes = 6;
+
+    HistoryManager history;
+    for( int i = 0; i < kPushes; ++i ) {
+        std::vector<Piece> live( piecesPerSnapshot,
+                                 Piece{ BufferType::Add, static_cast<uint64_t>( i ), 1 } );
+        history.recordState( live, static_cast<uint64_t>( i ) );
+    }
+
+    // The most recent state survived the eviction sweep.
+    EXPECT_TRUE( history.canUndo() );
+
+    // Drain the undo stack to count how many snapshots were actually retained. Each undo merely
+    // moves a snapshot onto the redo stack, so peak memory stays bounded by the retained set.
+    std::vector<Piece> scratch;
+    int retained = 0;
+    while( history.undo( scratch ).has_value() ) {
+        ++retained;
+    }
+
+    EXPECT_GE( retained, 1 );        // never evict the last surviving state
+    EXPECT_LT( retained, kPushes );  // oldest snapshots were dropped
+
+    // The retained aggregate respects the memory cap (with >= 2 survivors the sweep always
+    // finishes at or below the limit).
+    EXPECT_LE( static_cast<uint64_t>( retained ) * piecesPerSnapshot * sizeof( Piece ),
+               kMaxUndoBytes );
 }
