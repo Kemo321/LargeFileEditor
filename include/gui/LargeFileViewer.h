@@ -22,7 +22,10 @@
 #include <vector>
 
 #include "backend/PieceTable.h"
+#include "gui/CursorManager.h"
+#include "gui/EditorController.h"
 #include "gui/LineManager.h"
+#include "gui/TextRenderer.h"
 
 /**
  * @class LargeFileViewer
@@ -146,11 +149,8 @@ protected:
     auto mousePressEvent( QMouseEvent* event ) -> void override;
 
 private:
-    auto blinkCursor() -> void;
     auto onScrollbarMoved( int value ) -> void;
     auto paintViewport( QPaintEvent* event ) -> void;
-
-    [[nodiscard]] auto getLogicalPosition( int line, int col ) const -> uint64_t;
 
     auto refreshLineOffsets() -> void;
     auto invalidateCache( uint64_t offset = 0 ) -> void;
@@ -165,10 +165,10 @@ private:
 
     QLabel* scrollbar_tooltip_{ nullptr };
 
-    int cursor_line_{ 0 };
-    int cursor_col_{ 0 };
-    bool cursor_visible_{ true };
-    QTimer* cursor_timer_{ nullptr };
+    CursorManager* cursor_{ nullptr };
+    EditorController* controller_{ nullptr };
+    TextRenderer renderer_;
+
     QTimer* line_offset_timer_{ nullptr };
 
     bool render_busy_{ false };

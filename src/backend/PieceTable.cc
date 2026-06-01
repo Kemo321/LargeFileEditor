@@ -1,68 +1,26 @@
 #include "backend/PieceTable.h"
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <algorithm>
-#include <cctype>
 #include <fstream>
-#include <numeric>
 #include <stdexcept>
 #include <utility>
 
+#include "backend/KmpSearch.h"
+
 static constexpr uint64_t kEstimatedLineLength = 50;
 static constexpr uint64_t kMaxPreallocation = 512ULL * 1024ULL * 1024ULL;
-static constexpr size_t kMaxUndoHistory = 100;
-static constexpr uint64_t kMaxUndoBytes = 256ULL * 1024ULL * 1024ULL;
 
 PieceTable::PieceTable() = default;
 
-PieceTable::PieceTable( const std::string& filePath )
+PieceTable::PieceTable( const std::string& filePath ) : mappedFile_( filePath )
 {
-    openMmap( filePath );
-    if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr && mmapSize_ > 0 ) {
-        pieces_.push_back( { BufferType::Original, 0, mmapSize_ } );
+    if( mappedFile_.isValid() ) {
+        pieces_.push_back( { BufferType::Original, 0, mappedFile_.size() } );
     }
     rebuildOffsetIndex();
 }
 
-PieceTable::~PieceTable()
-{
-    closeMmap();
-}
-
-auto PieceTable::openMmap( const std::string& filePath ) -> void
-{
-    fileDescriptor_ = open( filePath.c_str(), O_RDONLY );
-    if( fileDescriptor_ == -1 ) {
-        return;
-    }
-
-    struct stat statBuffer {};
-    if( fstat( fileDescriptor_, &statBuffer ) == -1 ) {
-        close( fileDescriptor_ );
-        fileDescriptor_ = -1;
-        return;
-    }
-
-    mmapSize_ = static_cast<uint64_t>( statBuffer.st_size );
-    originalBuffer_ = static_cast<const char*>(
-        mmap( nullptr, mmapSize_, PROT_READ, MAP_PRIVATE, fileDescriptor_, 0 ) );
-}
-
-auto PieceTable::closeMmap() -> void
-{
-    if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr ) {
-        munmap( const_cast<char*>( originalBuffer_ ), mmapSize_ );
-        originalBuffer_ = nullptr;
-    }
-    if( fileDescriptor_ != -1 ) {
-        close( fileDescriptor_ );
-        fileDescriptor_ = -1;
-    }
-}
+PieceTable::~PieceTable() = default;
 
 auto PieceTable::size() const -> uint64_t
 {
@@ -115,8 +73,8 @@ auto PieceTable::getText() const -> std::string
 
     for( const auto& piece : pieces_ ) {
         if( piece.type_ == BufferType::Original ) {
-            if( originalBuffer_ != MAP_FAILED && originalBuffer_ != nullptr ) {
-                result.append( originalBuffer_ + piece.start_, piece.length_ );
+            if( mappedFile_.data() != nullptr ) {
+                result.append( mappedFile_.data() + piece.start_, piece.length_ );
             }
         } else {
             result.append( addBuffer_.data() + piece.start_, piece.length_ );
@@ -141,7 +99,7 @@ auto PieceTable::getSubstr( uint64_t position, uint64_t length ) const -> std::s
         uint64_t availableInPiece = piece.length_ - offset;
         uint64_t toCopy = std::min( remaining, availableInPiece );
         const char* bufferPtr =
-            ( piece.type_ == BufferType::Original ) ? originalBuffer_ : addBuffer_.data();
+            ( piece.type_ == BufferType::Original ) ? mappedFile_.data() : addBuffer_.data();
         result.append( bufferPtr + piece.start_ + offset, toCopy );
         remaining -= toCopy;
         offset = 0;
@@ -183,7 +141,7 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
     if( text.empty() ) {
         return;
     }
-    saveState();
+    history_.recordState( pieces_ );
 
     const uint64_t currentSize = size();
     if( position > currentSize ) {
@@ -213,7 +171,7 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
     if( length == 0 ) {
         return;
     }
-    saveState();
+    history_.recordState( pieces_ );
     if( position + length > size() ) {
         throw std::out_of_range( "Remove out of range" );
     }
@@ -247,132 +205,44 @@ auto PieceTable::saveToFile( const std::string& filePath ) const -> bool
 
     for( const auto& piece : pieces_ ) {
         const char* bufferPtr =
-            ( piece.type_ == BufferType::Original ) ? originalBuffer_ : addBuffer_.data();
-        if( bufferPtr != nullptr && bufferPtr != MAP_FAILED ) {
+            ( piece.type_ == BufferType::Original ) ? mappedFile_.data() : addBuffer_.data();
+        if( bufferPtr != nullptr ) {
             outFile.write( bufferPtr + piece.start_,
                            static_cast<std::streamsize>( piece.length_ ) );
         }
     }
 
     if( outFile.good() ) {
-        const_cast<PieceTable*>( this )->lastSavedUndoSize_ = undoStack_.size();
+        const_cast<PieceTable*>( this )->history_.markSaved();
         return true;
     }
     return false;
 }
 
-auto PieceTable::computeLPS( const std::string& pattern ) -> std::vector<int>
-{
-    const int length = static_cast<int>( pattern.length() );
-    std::vector<int> lps( length, 0 );
-    int len = 0;
-    int idx = 1;
-
-    while( idx < length ) {
-        if( pattern[idx] == pattern[len] ) {
-            len++;
-            lps[idx] = len;
-            idx++;
-        } else {
-            if( len != 0 ) {
-                len = lps[len - 1];
-            } else {
-                lps[idx] = 0;
-                idx++;
-            }
-        }
-    }
-    return lps;
-}
-
-auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool matchWord ) const
-    -> std::vector<uint64_t>
+auto PieceTable::findAll( const std::string& pattern, bool matchCase,
+                          bool matchWord ) const -> std::vector<uint64_t>
 {
     static const std::atomic<bool> never{ false };
-    return findAllImpl(
-        pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+    return findAllImpl( pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
 }
 
 auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
                               const std::function<void( uint64_t, uint64_t )>& progress,
                               const std::atomic<bool>& cancel ) const -> std::vector<uint64_t>
 {
-    // Poll progress/cancel roughly every 1 MiB of scanned bytes.
-    static constexpr uint64_t kScanProgressMask = ( 1ULL << 20 ) - 1;
-
-    std::vector<uint64_t> results;
-    const uint64_t totalBytes = size();
-    if( pattern.empty() || totalBytes == 0 ) {
-        return results;
-    }
-
-    std::string searchPattern = pattern;
-    if( !matchCase ) {
-        std::transform( searchPattern.begin(), searchPattern.end(), searchPattern.begin(),
-                        []( unsigned char ch ) { return std::tolower( ch ); } );
-    }
-
-    std::vector<int> lps = computeLPS( searchPattern );
-    int matchIdx = 0;
-    uint64_t logical_pos = 0;
-
+    std::vector<KmpSearch::Span> spans;
+    spans.reserve( pieces_.size() );
     for( const auto& piece : pieces_ ) {
         const char* bufferPtr =
-            ( piece.type_ == BufferType::Original ) ? originalBuffer_ : addBuffer_.data();
-        if( bufferPtr == nullptr || bufferPtr == MAP_FAILED ) {
-            logical_pos += piece.length_;
-            continue;
-        }
-
-        for( uint64_t idx = 0; idx < piece.length_; ++idx ) {
-            if( ( logical_pos & kScanProgressMask ) == 0 ) {
-                if( cancel.load( std::memory_order_relaxed ) ) {
-                    return {};
-                }
-                progress( logical_pos, totalBytes );
-            }
-
-            char currentChar = bufferPtr[piece.start_ + idx];
-            char compareChar = matchCase ? currentChar
-                                         : static_cast<char>( std::tolower(
-                                               static_cast<unsigned char>( currentChar ) ) );
-
-            while( matchIdx > 0 && searchPattern[matchIdx] != compareChar ) {
-                matchIdx = lps[matchIdx - 1];
-            }
-            if( searchPattern[matchIdx] == compareChar ) {
-                matchIdx++;
-            }
-
-            if( matchIdx == static_cast<int>( searchPattern.length() ) ) {
-                uint64_t foundPos = logical_pos - matchIdx + 1;
-                bool keepResult = true;
-
-                if( matchWord ) {
-                    char before = getSubstr( foundPos - 1, 1 )[0];
-                    if( std::isalnum( static_cast<unsigned char>( before ) ) != 0 ) {
-                        keepResult = false;
-                    }
-                    if( keepResult && ( foundPos + matchIdx < totalBytes ) ) {
-                        char after = getSubstr( foundPos + matchIdx, 1 )[0];
-                        if( std::isalnum( static_cast<unsigned char>( after ) ) != 0 ) {
-                            keepResult = false;
-                        }
-                    }
-                }
-
-                if( keepResult ) {
-                    results.push_back( foundPos );
-                }
-                // Non-overlapping semantics: resume scanning after the consumed match
-                // (both accepted and word-boundary-rejected terminal branches reset to 0)
-                // so successive matches are always at least patternLen apart.
-                matchIdx = 0;
-            }
-            logical_pos++;
-        }
+            ( piece.type_ == BufferType::Original ) ? mappedFile_.data() : addBuffer_.data();
+        const char* spanData = ( bufferPtr != nullptr ) ? bufferPtr + piece.start_ : nullptr;
+        spans.push_back( { spanData, piece.length_ } );
     }
-    return results;
+
+    KmpSearch searcher;
+    return searcher.findAll(
+        spans, size(), pattern, matchCase, matchWord,
+        [this]( uint64_t pos ) { return getSubstr( pos, 1 )[0]; }, progress, cancel );
 }
 
 auto PieceTable::replaceAll( const std::string& pattern, const std::string& replacement,
@@ -460,7 +330,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
     }
     advance( totalBytes, true );  // copy the tail (pieces_ not yet mutated, so size == totalBytes)
 
-    saveState();
+    history_.recordState( pieces_ );
     pieces_ = std::move( newPieces );
     coalescePieces();  // single defrag pass before the main thread repaints
     rebuildOffsetIndex();
@@ -480,73 +350,32 @@ auto PieceTable::replaceFirst( const std::string& pattern, const std::string& re
     return true;
 }
 
-void PieceTable::saveState()
-{
-    if( isBatchOperation_ ) {
-        return;
-    }
-    undoStack_.push_back( pieces_ );
-    redoStack_.clear();
-
-    if( undoStack_.size() > kMaxUndoHistory ) {
-        undoStack_.erase( undoStack_.begin() );
-    }
-
-    // Memory guard: snapshots are full copies of pieces_, which can hold millions of entries
-    // after a large replaceAll. Cap total undo memory by evicting oldest snapshots (keeping at
-    // least the most recent) so editing a heavily fragmented document cannot exhaust RAM.
-    uint64_t undoBytes = std::accumulate(
-        undoStack_.begin(), undoStack_.end(), 0ULL,
-        []( uint64_t acc, const std::vector<Piece>& snapshot ) -> uint64_t {
-            return acc + ( static_cast<uint64_t>( snapshot.size() ) * sizeof( Piece ) );
-        } );
-
-    while( undoStack_.size() > 1 && undoBytes > kMaxUndoBytes ) {
-        undoBytes -= static_cast<uint64_t>( undoStack_.front().size() ) * sizeof( Piece );
-        undoStack_.erase( undoStack_.begin() );
-    }
-}
-
 auto PieceTable::undo() -> bool
 {
-    if( undoStack_.empty() ) {
+    if( !history_.undo( pieces_ ) ) {
         return false;
     }
-    redoStack_.push_back( pieces_ );
-    pieces_ = undoStack_.back();
-    undoStack_.pop_back();
     rebuildOffsetIndex();
     return true;
 }
 
 auto PieceTable::redo() -> bool
 {
-    if( redoStack_.empty() ) {
+    if( !history_.redo( pieces_ ) ) {
         return false;
     }
-    undoStack_.push_back( pieces_ );
-    pieces_ = redoStack_.back();
-    redoStack_.pop_back();
     rebuildOffsetIndex();
     return true;
 }
 
 PieceTable::PieceTable( PieceTable&& other ) noexcept
-    : originalBuffer_( other.originalBuffer_ ),
-      mmapSize_( other.mmapSize_ ),
-      fileDescriptor_( other.fileDescriptor_ ),
+    : mappedFile_( std::move( other.mappedFile_ ) ),
       addBuffer_( std::move( other.addBuffer_ ) ),
       pieces_( std::move( other.pieces_ ) ),
       pieceStartOffsets_( std::move( other.pieceStartOffsets_ ) ),
       total_size_( other.total_size_ ),
-      isBatchOperation_( other.isBatchOperation_ ),
-      lastSavedUndoSize_( other.lastSavedUndoSize_ ),
-      undoStack_( std::move( other.undoStack_ ) ),
-      redoStack_( std::move( other.redoStack_ ) )
+      history_( std::move( other.history_ ) )
 {
-    other.originalBuffer_ = nullptr;
-    other.fileDescriptor_ = -1;
-    other.mmapSize_ = 0;
     other.total_size_ = 0;
     other.pieceStartOffsets_.assign( 1, 0 );
 }
@@ -554,30 +383,21 @@ PieceTable::PieceTable( PieceTable&& other ) noexcept
 auto PieceTable::operator=( PieceTable&& other ) noexcept -> PieceTable&
 {
     if( this != &other ) {
-        closeMmap();
-        originalBuffer_ = other.originalBuffer_;
-        mmapSize_ = other.mmapSize_;
-        fileDescriptor_ = other.fileDescriptor_;
+        mappedFile_ = std::move( other.mappedFile_ );
         addBuffer_ = std::move( other.addBuffer_ );
         pieces_ = std::move( other.pieces_ );
         pieceStartOffsets_ = std::move( other.pieceStartOffsets_ );
         total_size_ = other.total_size_;
-        isBatchOperation_ = other.isBatchOperation_;
-        lastSavedUndoSize_ = other.lastSavedUndoSize_;
-        undoStack_ = std::move( other.undoStack_ );
-        redoStack_ = std::move( other.redoStack_ );
+        history_ = std::move( other.history_ );
 
-        other.originalBuffer_ = nullptr;
-        other.fileDescriptor_ = -1;
-        other.mmapSize_ = 0;
         other.total_size_ = 0;
         other.pieceStartOffsets_.assign( 1, 0 );
     }
     return *this;
 }
 
-auto PieceTable::getFragmentsInRange( uint64_t position, uint64_t length ) const
-    -> std::vector<Piece>
+auto PieceTable::getFragmentsInRange( uint64_t position,
+                                      uint64_t length ) const -> std::vector<Piece>
 {
     std::vector<Piece> fragments;
     if( length == 0 || position >= size() ) {

@@ -12,27 +12,20 @@
 #include <string>
 #include <vector>
 
+#include "backend/HistoryManager.h"
+#include "backend/MemoryMappedFile.h"
+#include "backend/Piece.h"
+
 /**
  * @class PieceTable
  * @brief Efficient data structure for text editing in very large files.
  */
 class PieceTable {
 public:
-    /**
-     * @enum BufferType
-     * @brief Identifies the buffer origin for a specific text piece.
-     */
-    enum class BufferType : std::uint8_t { Original, Add };
-
-    /**
-     * @struct Piece
-     * @brief Represents a continuous segment of text in one of the buffers.
-     */
-    struct Piece {
-        BufferType type_;
-        uint64_t start_;
-        uint64_t length_;
-    };
+    /// Buffer origin of a text piece (see backend/Piece.h).
+    using BufferType = ::BufferType;
+    /// A contiguous text segment (see backend/Piece.h).
+    using Piece = ::Piece;
 
     /**
      * @brief Default constructor for an empty PieceTable.
@@ -134,8 +127,8 @@ public:
      * @param length Length of the range.
      * @return Vector of intersecting pieces.
      */
-    [[nodiscard]] auto getFragmentsInRange( uint64_t position, uint64_t length ) const
-        -> std::vector<Piece>;
+    [[nodiscard]] auto getFragmentsInRange( uint64_t position,
+                                            uint64_t length ) const -> std::vector<Piece>;
 
     /**
      * @brief Inserts text at the specified logical position.
@@ -176,7 +169,7 @@ public:
      */
     [[nodiscard]] auto canUndo() const -> bool
     {
-        return !undoStack_.empty();
+        return history_.canUndo();
     }
 
     /**
@@ -185,7 +178,7 @@ public:
      */
     [[nodiscard]] auto canRedo() const -> bool
     {
-        return !redoStack_.empty();
+        return history_.canRedo();
     }
 
     /**
@@ -194,7 +187,7 @@ public:
      */
     [[nodiscard]] auto isDirty() const -> bool
     {
-        return undoStack_.size() != lastSavedUndoSize_;
+        return history_.isDirty();
     }
 
     /**
@@ -218,19 +211,12 @@ public:
     // [[nodiscard]] auto getLineFromPosition( uint64_t position ) const -> int;
 
 private:
-    [[nodiscard]] static auto computeLPS( const std::string& pattern ) -> std::vector<int>;
-
-    // Shared KMP scan backing findAll/replaceAll. Reports byte-based progress and
-    // aborts (returns the matches found so far is NOT done — returns empty) when cancel is set.
+    // Shared KMP scan backing findAll/replaceAll. Resolves pieces_ into spans and delegates to
+    // KmpSearch. Reports byte-based progress and returns empty when cancel is set.
     [[nodiscard]] auto findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,
                                     const std::function<void( uint64_t, uint64_t )>& progress,
                                     const std::atomic<bool>& cancel ) const
         -> std::vector<uint64_t>;
-
-    std::vector<std::vector<Piece>> undoStack_;
-    std::vector<std::vector<Piece>> redoStack_;
-
-    auto saveState() -> void;
 
     struct FindResult {
         size_t pieceIndex_;
@@ -249,12 +235,7 @@ private:
     // pieces_ after a fragmenting batch operation (length-preserving; total_size_ untouched).
     auto coalescePieces() -> void;
 
-    auto openMmap( const std::string& filePath ) -> void;
-    auto closeMmap() -> void;
-
-    const char* originalBuffer_{ nullptr };
-    uint64_t mmapSize_{ 0 };
-    int fileDescriptor_{ -1 };
+    MemoryMappedFile mappedFile_;
 
     std::string addBuffer_;
     std::vector<Piece> pieces_;
@@ -266,6 +247,5 @@ private:
 
     uint64_t total_size_{ 0 };  // cached sum of piece lengths; size() returns this in O(1)
 
-    bool isBatchOperation_{ false };
-    uint64_t lastSavedUndoSize_{ 0 };
+    HistoryManager history_;
 };

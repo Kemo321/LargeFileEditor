@@ -23,15 +23,34 @@ include_directories(include)
 set(SOURCES
     src/Main.cc
     src/backend/PieceTable.cc
+    src/backend/MemoryMappedFile.cc
+    src/backend/KmpSearch.cc
+    src/backend/HistoryManager.cc
     src/gui/MainWindow.cc
     src/gui/LargeFileViewer.cc
     src/gui/LineManager.cc
     src/gui/FindReplaceDialog.cc
+    src/gui/CursorManager.cc
+    src/gui/TextRenderer.cc
+    src/gui/EditorController.cc
+    src/gui/BackgroundTaskManager.cc
+    src/util/Utf8Utils.cc
+    src/util/FileUtils.cc
     include/gui/MainWindow.h
     include/gui/LargeFileViewer.h
     include/gui/LineManager.h
     include/gui/FindReplaceDialog.h
-    include/backend/PieceTable.h)
+    include/gui/CursorManager.h
+    include/gui/TextRenderer.h
+    include/gui/EditorController.h
+    include/gui/BackgroundTaskManager.h
+    include/backend/PieceTable.h
+    include/backend/Piece.h
+    include/backend/MemoryMappedFile.h
+    include/backend/KmpSearch.h
+    include/backend/HistoryManager.h
+    include/util/Utf8Utils.h
+    include/util/FileUtils.h)
 include_directories(include)
 
 add_executable(LargeFileEditor ${SOURCES})
