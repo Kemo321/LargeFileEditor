@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "backend/Piece.h"
@@ -20,29 +21,42 @@
  */
 class HistoryManager {
 public:
-    using Snapshot = std::vector<Piece>;
+    /**
+     * @brief A historical document state: the piece sequence plus the cursor byte offset that
+     *        should regain focus when this state is restored.
+     *
+     * The @ref cursorOffset_ describes the edit transition that produced the state, so the same
+     * value drives the cursor jump whether the state is reached by undo or by redo.
+     */
+    struct Snapshot {
+        std::vector<Piece> pieces_;
+        uint64_t cursorOffset_{ 0 };
+    };
 
     /**
      * @brief Records @p current as an undo point and clears the redo stack.
      *
      * No-op while a batch operation is in progress. Evicts oldest snapshots to respect the
      * count and total-memory caps (always keeping at least the most recent).
+     *
+     * @param current The pre-mutation piece list to snapshot.
+     * @param cursorOffset Logical byte offset of the edit, restored on undo/redo.
      */
-    void recordState( const Snapshot& current );
+    void recordState( const std::vector<Piece>& current, uint64_t cursorOffset );
 
     /**
      * @brief Reverts to the previous snapshot.
      * @param current In/out: the live piece list, swapped with the restored snapshot.
-     * @return True if an undo was performed.
+     * @return The restored cursor byte offset, or std::nullopt if no undo was available.
      */
-    [[nodiscard]] auto undo( Snapshot& current ) -> bool;
+    [[nodiscard]] auto undo( std::vector<Piece>& current ) -> std::optional<uint64_t>;
 
     /**
      * @brief Re-applies the last reverted snapshot.
      * @param current In/out: the live piece list, swapped with the restored snapshot.
-     * @return True if a redo was performed.
+     * @return The restored cursor byte offset, or std::nullopt if no redo was available.
      */
-    [[nodiscard]] auto redo( Snapshot& current ) -> bool;
+    [[nodiscard]] auto redo( std::vector<Piece>& current ) -> std::optional<uint64_t>;
 
     [[nodiscard]] auto canUndo() const -> bool;
     [[nodiscard]] auto canRedo() const -> bool;

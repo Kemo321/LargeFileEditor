@@ -141,7 +141,7 @@ auto PieceTable::insert( uint64_t position, const std::string& text ) -> void
     if( text.empty() ) {
         return;
     }
-    history_.recordState( pieces_ );
+    history_.recordState( pieces_, position );
 
     const uint64_t currentSize = size();
     if( position > currentSize ) {
@@ -171,7 +171,7 @@ auto PieceTable::remove( uint64_t position, uint64_t length ) -> void
     if( length == 0 ) {
         return;
     }
-    history_.recordState( pieces_ );
+    history_.recordState( pieces_, position );
     if( position + length > size() ) {
         throw std::out_of_range( "Remove out of range" );
     }
@@ -331,7 +331,7 @@ auto PieceTable::replaceAll( const std::string& pattern, const std::string& repl
     }
     advance( totalBytes, true );  // copy the tail (pieces_ not yet mutated, so size == totalBytes)
 
-    history_.recordState( pieces_ );
+    history_.recordState( pieces_, occurrences.front() );  // focus the first replaced site
     pieces_ = std::move( newPieces );
     coalescePieces();  // single defrag pass before the main thread repaints
     rebuildOffsetIndex();
@@ -351,22 +351,26 @@ auto PieceTable::replaceFirst( const std::string& pattern, const std::string& re
     return true;
 }
 
-auto PieceTable::undo() -> bool
+auto PieceTable::undo() -> std::optional<uint64_t>
 {
-    if( !history_.undo( pieces_ ) ) {
-        return false;
+    std::optional<uint64_t> offset = history_.undo( pieces_ );
+    if( !offset ) {
+        return std::nullopt;
     }
     rebuildOffsetIndex();
-    return true;
+    // Clamp: a contracting edit can shrink the document below the recorded offset; never hand
+    // the view a position past EOF.
+    return std::min( *offset, total_size_ );
 }
 
-auto PieceTable::redo() -> bool
+auto PieceTable::redo() -> std::optional<uint64_t>
 {
-    if( !history_.redo( pieces_ ) ) {
-        return false;
+    std::optional<uint64_t> offset = history_.redo( pieces_ );
+    if( !offset ) {
+        return std::nullopt;
     }
     rebuildOffsetIndex();
-    return true;
+    return std::min( *offset, total_size_ );
 }
 
 PieceTable::PieceTable( PieceTable&& other ) noexcept

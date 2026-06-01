@@ -9,6 +9,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -153,15 +154,17 @@ public:
 
     /**
      * @brief Reverts the last text modification.
-     * @return True if undo was successful.
+     * @return The logical byte offset to refocus the cursor on (clamped to the document size),
+     *         or std::nullopt if there was nothing to undo.
      */
-    auto undo() -> bool;
+    auto undo() -> std::optional<uint64_t>;
 
     /**
      * @brief Reapplies the last reverted text modification.
-     * @return True if redo was successful.
+     * @return The logical byte offset to refocus the cursor on (clamped to the document size),
+     *         or std::nullopt if there was nothing to redo.
      */
-    auto redo() -> bool;
+    auto redo() -> std::optional<uint64_t>;
 
     /**
      * @brief Checks if an undo operation is available.
