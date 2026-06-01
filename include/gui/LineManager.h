@@ -57,8 +57,8 @@ public:
     /**
      * @brief Gets a chunk of a line, ensuring UTF-8 boundaries.
      */
-    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col,
-                                     uint64_t length ) -> std::string;
+    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col, uint64_t length )
+        -> std::string;
 
 private:
     void ensureLineCalculated( int target_line );

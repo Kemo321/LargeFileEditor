@@ -75,6 +75,6 @@ public:
      * @param eventRect The region requiring repaint.
      * @param ctx Read-only snapshot of view state.
      */
-    static auto paint( QPainter& painter, const QRect& eventRect,
-                       const RenderContext& ctx ) -> void;
+    static auto paint( QPainter& painter, const QRect& eventRect, const RenderContext& ctx )
+        -> void;
 };

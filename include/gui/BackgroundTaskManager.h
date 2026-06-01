@@ -31,8 +31,8 @@ public:
     auto startSave( PieceTable* table, const QString& tempPath ) -> void;
 
     /// Searches @p table for @p text on a worker thread; emits @ref findFinished.
-    auto startFind( PieceTable* table, const QString& text, bool matchCase,
-                    bool matchWord ) -> void;
+    auto startFind( PieceTable* table, const QString& text, bool matchCase, bool matchWord )
+        -> void;
 
     /// Replaces every match in @p table on a worker thread; emits progress and @ref
     /// replaceFinished.
