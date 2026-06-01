@@ -9,6 +9,7 @@ class PieceTable;
 
 /**
  * @class LineManager
+ * @author Jan Szwagierczak
  * @brief Maps "Virtual Line Numbers" to "Global Byte Offsets" for the PieceTable.
  * Implements "Hard Soft-Wrap" to avoid freezing on extremely long lines.
  */

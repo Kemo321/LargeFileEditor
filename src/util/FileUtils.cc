@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "util/FileUtils.h"
 
 #include <QByteArray>

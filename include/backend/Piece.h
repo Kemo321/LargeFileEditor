@@ -1,5 +1,6 @@
 /**
  * @file Piece.h
+ * @author Tomasz Okon
  * @brief Core value types shared by the PieceTable and its collaborators.
  */
 

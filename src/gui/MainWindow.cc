@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "gui/MainWindow.h"
 
 #include <QApplication>

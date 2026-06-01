@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "gui/LargeFileViewer.h"
 
 #include <QCursor>

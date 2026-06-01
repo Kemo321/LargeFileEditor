@@ -1,3 +1,5 @@
+// Author: Tomasz Okon
+
 #include "backend/MemoryMappedFile.h"
 
 #include <fcntl.h>

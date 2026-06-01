@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "util/Utf8Utils.h"
 
 namespace Utf8Utils {

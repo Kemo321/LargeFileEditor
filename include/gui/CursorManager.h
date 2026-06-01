@@ -1,5 +1,6 @@
 /**
  * @file CursorManager.h
+ * @author Jan Szwagierczak
  * @brief Cursor coordinate and blink/visibility state for the editor viewport.
  */
 

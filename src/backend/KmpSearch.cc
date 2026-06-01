@@ -1,3 +1,4 @@
+// Author: Tomasz Okon
 #include "backend/KmpSearch.h"
 
 #include <algorithm>

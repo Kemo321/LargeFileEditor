@@ -1,5 +1,6 @@
 /**
  * @file TextRenderer.h
+ * @author Jan Szwagierczak
  * @brief Renders the virtualized text grid (gutter, text, highlights, cursor) for the viewer.
  */
 

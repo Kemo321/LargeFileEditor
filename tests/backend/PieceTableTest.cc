@@ -1,6 +1,6 @@
 /**
  * @file PieceTableTest.cc
- * @author Tomasz Okon
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Unit tests for the PieceTable backend logic.
  */
 #include <gtest/gtest.h>

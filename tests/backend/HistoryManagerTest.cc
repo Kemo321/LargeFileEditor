@@ -1,5 +1,6 @@
 /**
  * @file HistoryManagerTest.cc
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Unit tests for the HistoryManager undo/redo stacks.
  */
 #include <gtest/gtest.h>

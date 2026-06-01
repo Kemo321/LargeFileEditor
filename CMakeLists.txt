@@ -18,8 +18,6 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Concurrent)
 
-# Coverage instrumentation must be injected BEFORE any target is defined so the
-# flags propagate to LargeFileEditor and unit_tests.
 option(ENABLE_COVERAGE "Build with coverage instrumentation (GCC/Clang)" OFF)
 
 if(ENABLE_COVERAGE)
@@ -76,7 +74,6 @@ find_package(GTest REQUIRED)
 enable_testing()
 add_subdirectory(tests)
 
-# Doxygen Documentation
 find_package(Doxygen)
 
 if(DOXYGEN_FOUND)
@@ -93,7 +90,6 @@ else()
   message(WARNING "Doxygen not found. Target 'doc' will not be created.")
 endif()
 
-# Coverage pipeline target: reset -> test -> capture -> filter -> HTML report.
 if(ENABLE_COVERAGE)
   find_program(LCOV_PATH lcov)
   find_program(GENHTML_PATH genhtml)
@@ -110,19 +106,14 @@ if(ENABLE_COVERAGE)
 
     add_custom_target(
       coverage
-      # 1. Reset previous instrumentation data
       COMMAND ${_lcov} --directory ${CMAKE_BINARY_DIR} --zerocounters
-      # 1. Run all tests to emit fresh .gcda files
       COMMAND ${_ctest_cmd}
-      # 1. Capture raw coverage
       COMMAND ${_lcov} --directory ${CMAKE_BINARY_DIR} --capture --output-file
               ${CMAKE_BINARY_DIR}/coverage.info
-      # 1. Filter third-party / tests / system headers
       COMMAND
         ${_lcov} --remove ${CMAKE_BINARY_DIR}/coverage.info /usr/* */tests/*
         */googletest/* */extern/* --output-file
         ${CMAKE_BINARY_DIR}/coverage.filtered.info
-      # 1. Generate HTML dashboard
       COMMAND ${GENHTML_PATH} ${CMAKE_BINARY_DIR}/coverage.filtered.info
               --output-directory ${CMAKE_BINARY_DIR}/coverage_report
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

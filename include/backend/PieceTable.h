@@ -1,6 +1,6 @@
 /**
  * @file PieceTable.h
- * @author Tomasz Okon
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Logic layer header for the Piece Table implementation.
  */
 

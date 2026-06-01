@@ -1,5 +1,6 @@
 /**
  * @file EditorController.h
+ * @author Jan Szwagierczak
  * @brief Translates raw keyboard/mouse input into high-level editing commands.
  */
 

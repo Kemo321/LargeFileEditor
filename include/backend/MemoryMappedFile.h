@@ -1,5 +1,6 @@
 /**
  * @file MemoryMappedFile.h
+ * @author Tomasz Okon
  * @brief RAII wrapper around POSIX memory-mapping of a read-only file.
  */
 

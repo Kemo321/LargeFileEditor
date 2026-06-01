@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "backend/PieceTable.h"
 
 #include <algorithm>

@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "gui/LineManager.h"
 
 #include <algorithm>

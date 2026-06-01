@@ -1,3 +1,5 @@
+// Author: Tomasz Okon, Jan Szwagierczak
+
 #include "backend/HistoryManager.h"
 
 #include <numeric>

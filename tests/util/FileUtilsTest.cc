@@ -1,5 +1,6 @@
 /**
  * @file FileUtilsTest.cc
+ * @author Jan Szwagierczak
  * @brief Unit tests for FileUtils::isBinaryFile.
  */
 #include <gtest/gtest.h>

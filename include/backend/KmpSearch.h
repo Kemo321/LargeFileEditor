@@ -1,5 +1,6 @@
 /**
  * @file KmpSearch.h
+ * @author Tomasz Okon
  * @brief Knuth-Morris-Pratt substring search over a sequence of memory spans.
  */
 

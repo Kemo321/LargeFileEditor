@@ -1,5 +1,6 @@
 /**
  * @file HistoryManager.h
+ * @author Tomasz Okon, Jan Szwagierczak
  * @brief Undo/redo snapshot stacks and dirty-state tracking for the PieceTable.
  */
 

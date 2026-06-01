@@ -1,3 +1,5 @@
+// Author: Jan Szwagierczak
+
 #include "gui/TextRenderer.h"
 
 #include <QFontMetrics>

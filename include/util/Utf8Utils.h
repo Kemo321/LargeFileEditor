@@ -1,5 +1,6 @@
 /**
  * @file Utf8Utils.h
+ * @author Jan Szwagierczak
  * @brief Low-level UTF-8 byte parsing helpers shared across the editor.
  */
 

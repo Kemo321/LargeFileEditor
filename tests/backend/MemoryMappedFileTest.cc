@@ -1,5 +1,6 @@
 /**
  * @file MemoryMappedFileTest.cc
+ * @author Tomasz Okon
  * @brief Unit tests for the MemoryMappedFile RAII wrapper.
  */
 #include <gtest/gtest.h>

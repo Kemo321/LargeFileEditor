@@ -1,5 +1,6 @@
 /**
  * @file FileUtils.h
+ * @author Jan Szwagierczak
  * @brief File-level helpers (binary detection) decoupled from the UI.
  */
 

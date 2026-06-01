@@ -1,5 +1,6 @@
 /**
  * @file QtTestApp.h
+ * @author Jan Szwagierczak
  * @brief Provides a single process-wide QGuiApplication for the headless GUI unit tests.
  *
  * The presentation-logic classes are QObjects: CursorManager owns a QTimer and the blink test

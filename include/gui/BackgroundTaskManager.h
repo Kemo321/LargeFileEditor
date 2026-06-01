@@ -1,5 +1,6 @@
 /**
  * @file BackgroundTaskManager.h
+ * @author Jan Szwagierczak
  * @brief Orchestrates the asynchronous save/find/replace tasks for the editor.
  */
 

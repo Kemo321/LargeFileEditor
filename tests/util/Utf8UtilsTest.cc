@@ -1,5 +1,6 @@
 /**
  * @file Utf8UtilsTest.cc
+ * @author Jan Szwagierczak
  * @brief Unit tests for the Utf8Utils byte-parsing helpers.
  */
 #include <gtest/gtest.h>
