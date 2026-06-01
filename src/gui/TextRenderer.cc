@@ -149,14 +149,19 @@ auto prepareLine( LineDrawContext& lc, int idx ) -> void
     }
 }
 
-// Draws the right-aligned line number in the gutter for the current line.
+// Draws the right-aligned logical line number in the gutter. Hard-wrapped continuation segments
+// share their parent's number, so their gutter cell is left blank (the row still occupies a full
+// lineHeight_, preserving vertical alignment).
 auto renderGutterAndLineNumbers( LineDrawContext& lc ) -> void
 {
+    if( !lc.ctx_.lineManager_->isLogicalLineStart( lc.currentLineIndex_ ) ) {
+        return;
+    }
     lc.painter_.setPen( QColor( "#808080" ) );
     lc.painter_.drawText(
         QRect( 0, lc.yBase_, lc.gutterWidth_ - editor_layout::kGutterTextPadding, lc.lineHeight_ ),
         static_cast<int>( Qt::AlignRight | Qt::AlignVCenter ),
-        formatLineNumber( lc.currentLineIndex_ + 1 ) );
+        formatLineNumber( lc.ctx_.lineManager_->getLogicalLineNumber( lc.currentLineIndex_ ) ) );
 }
 
 // Paints the highlight rectangles for search matches intersecting the current line.

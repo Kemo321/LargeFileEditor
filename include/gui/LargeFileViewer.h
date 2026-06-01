@@ -155,6 +155,8 @@ private:
     auto refreshLineOffsets() -> void;
     auto invalidateCache( uint64_t offset = 0 ) -> void;
 
+    auto emitCursorPosition() -> void;
+
     PieceTable* piece_table_{ nullptr };
     std::unique_ptr<LineManager> line_manager_;
     QStringList mock_highlight_words_;

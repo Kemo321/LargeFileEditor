@@ -83,3 +83,5 @@ coverage.js
 
 *.py
 .venv/
+
+bigfile.txt

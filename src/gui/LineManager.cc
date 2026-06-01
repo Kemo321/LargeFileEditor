@@ -19,6 +19,8 @@ void LineManager::reset()
     std::lock_guard<std::mutex> lock( cache_mutex_ );
     line_start_offsets_.clear();
     line_start_offsets_.push_back( 0 );
+    logical_line_numbers_.clear();
+    logical_line_numbers_.push_back( 0 );  // virtual line 0 is always logical line 0
     global_max_line_length_ = 0;
 }
 
@@ -33,7 +35,12 @@ void LineManager::invalidateCacheFromOffset( uint64_t offset )
     if( it != line_start_offsets_.begin() ) {
         --it;  // keep the line containing the offset
     }
+    auto kept = std::distance( line_start_offsets_.begin(), it ) + 1;
     line_start_offsets_.erase( it + 1, line_start_offsets_.end() );
+    if( kept < static_cast<decltype( kept )>( logical_line_numbers_.size() ) ) {
+        logical_line_numbers_.erase( logical_line_numbers_.begin() + kept,
+                                     logical_line_numbers_.end() );
+    }
 }
 
 void LineManager::ensureOffsetCalculated( uint64_t target_offset )
@@ -93,13 +100,18 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
             uint64_t new_len = current_offset - line_start_offsets_.back();
 
             std::string last_char = pt_->getSubstr( current_offset - 1, 1 );
-            if( last_char == "\n" ) {
+            bool ended_with_newline = ( last_char == "\n" );
+            if( ended_with_newline ) {
                 new_len -= 1;
             }
 
             if( new_len > global_max_line_length_ ) {
                 global_max_line_length_ = new_len;
             }
+            // The new virtual line starts a fresh logical line only if the segment that just ended
+            // was terminated by '\n'; a hard-wrap continuation keeps the previous logical number.
+            int prev_logical = logical_line_numbers_.back();
+            logical_line_numbers_.push_back( ended_with_newline ? prev_logical + 1 : prev_logical );
             line_start_offsets_.push_back( current_offset );
         }
     }
@@ -181,6 +193,56 @@ auto LineManager::getLineCount() -> int
     int estimated_remaining =
         static_cast<int>( ( file_size - processed_bytes ) / avg_bytes_per_line );
     return processed_lines + estimated_remaining;
+}
+
+auto LineManager::isLogicalLineStart( int virtual_line ) -> bool
+{
+    if( virtual_line <= 0 ) {
+        return true;  // the first virtual line always begins logical line 1
+    }
+    ensureLineCalculated( virtual_line );
+
+    std::lock_guard<std::mutex> lock( cache_mutex_ );
+    if( virtual_line >= static_cast<int>( logical_line_numbers_.size() ) ) {
+        return true;  // beyond the calculated cache: treat as a real line
+    }
+    return logical_line_numbers_[virtual_line] != logical_line_numbers_[virtual_line - 1];
+}
+
+auto LineManager::getLogicalLineNumber( int virtual_line ) -> int
+{
+    if( virtual_line < 0 ) {
+        return 1;
+    }
+    ensureLineCalculated( virtual_line );
+
+    std::lock_guard<std::mutex> lock( cache_mutex_ );
+    if( virtual_line >= static_cast<int>( logical_line_numbers_.size() ) ) {
+        return virtual_line + 1;  // estimation region: keep numbers monotonically increasing
+    }
+    return logical_line_numbers_[virtual_line] + 1;  // stored value is 0-based
+}
+
+auto LineManager::getLogicalColumn( int virtual_line, int col ) -> uint64_t
+{
+    if( virtual_line <= 0 ) {
+        return static_cast<uint64_t>( std::max( 0, col ) );
+    }
+    ensureLineCalculated( virtual_line );
+
+    std::lock_guard<std::mutex> lock( cache_mutex_ );
+    if( virtual_line >= static_cast<int>( line_start_offsets_.size() ) ) {
+        return static_cast<uint64_t>( std::max( 0, col ) );
+    }
+    // Walk back over wrapped continuation segments to the logical line start. Segments are
+    // contiguous in bytes (no newline between them), so the logical column is the byte distance
+    // from that start to this segment plus the in-segment column.
+    int start = virtual_line;
+    while( start > 0 && logical_line_numbers_[start] == logical_line_numbers_[start - 1] ) {
+        --start;
+    }
+    uint64_t span_before = line_start_offsets_[virtual_line] - line_start_offsets_[start];
+    return span_before + static_cast<uint64_t>( std::max( 0, col ) );
 }
 
 auto LineManager::getVirtualLineLength( int virtual_line ) -> uint64_t

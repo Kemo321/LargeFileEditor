@@ -107,24 +107,28 @@ auto MainWindow::closeEvent( QCloseEvent* event ) -> void
         return;
     }
 
-    QMessageBox msgBox(
-        QMessageBox::Warning, "Niezapisane zmiany",
-        "Dokument został zmodyfikowany. Czy chcesz zapisać zmiany przed zamknięciem?",
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this );
+    QMessageBox msgBox( this );
+    msgBox.setIcon( QMessageBox::Warning );
+    msgBox.setWindowTitle( "Niezapisane zmiany" );
+    msgBox.setText( "Dokument został zmodyfikowany. Czy chcesz zapisać zmiany przed zamknięciem?" );
     msgBox.setWindowFlags( Qt::Dialog | Qt::FramelessWindowHint );
 
-    int reply = msgBox.exec();
+    QPushButton* saveButton = msgBox.addButton( "Zapisz", QMessageBox::AcceptRole );
+    QPushButton* discardButton = msgBox.addButton( "Nie zapisuj", QMessageBox::DestructiveRole );
+    QPushButton* cancelButton = msgBox.addButton( "Anuluj", QMessageBox::RejectRole );
 
-    if( reply == QMessageBox::Save ) {
-        saveFile();  // asynchronous background save
+    msgBox.exec();
+
+    if( msgBox.clickedButton() == saveButton ) {
+        saveFile();
         if( tasks_->isSaveRunning() ) {
             beginCloseWait( event );
         } else {
             event->accept();
         }
-    } else if( reply == QMessageBox::Cancel ) {
+    } else if( msgBox.clickedButton() == cancelButton ) {
         event->ignore();
-    } else {
+    } else if( msgBox.clickedButton() == discardButton ) {
         event->accept();
     }
 }

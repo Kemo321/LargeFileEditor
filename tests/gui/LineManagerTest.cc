@@ -50,6 +50,62 @@ TEST( LineManagerTest, LineLengthExceedsMaxVisual )
     EXPECT_EQ( lm.getGlobalMaxLineLength(), 10U );
 }
 
+TEST( LineManagerTest, LogicalLineNumbersSkipWrappedSegments )
+{
+    PieceTable pt;
+    // "ab" (1 line) + a 25-char line that hard-wraps into three 10/10/5 segments + "zz".
+    pt.insert( 0, "ab\nABCDEFGHIJKLMNOPQRSTUVWXY\nzz" );
+
+    LineManager lm( &pt, /*max_visual_line_length=*/10 );
+
+    // Only \n-delimited lines start a new logical line; the two wrap continuations do not.
+    EXPECT_TRUE( lm.isLogicalLineStart( 0 ) );   // "ab"
+    EXPECT_TRUE( lm.isLogicalLineStart( 1 ) );   // first segment of the long line
+    EXPECT_FALSE( lm.isLogicalLineStart( 2 ) );  // wrapped continuation
+    EXPECT_FALSE( lm.isLogicalLineStart( 3 ) );  // wrapped continuation
+    EXPECT_TRUE( lm.isLogicalLineStart( 4 ) );   // "zz"
+
+    EXPECT_EQ( lm.getLogicalLineNumber( 0 ), 1 );
+    EXPECT_EQ( lm.getLogicalLineNumber( 1 ), 2 );
+    EXPECT_EQ( lm.getLogicalLineNumber( 2 ), 2 );
+    EXPECT_EQ( lm.getLogicalLineNumber( 3 ), 2 );
+    EXPECT_EQ( lm.getLogicalLineNumber( 4 ), 3 );
+}
+
+TEST( LineManagerTest, LogicalColumnFoldsWrappedSegments )
+{
+    PieceTable pt;
+    pt.insert( 0, "ab\nABCDEFGHIJKLMNOPQRSTUVWXY\nzz" );  // long line wraps 10/10/5
+
+    LineManager lm( &pt, /*max_visual_line_length=*/10 );
+
+    // First segment of the long line: column is already logical.
+    EXPECT_EQ( lm.getLogicalColumn( 1, 3 ), 3U );
+    // Second segment (continuation): col 2 is really byte 12 of the physical line.
+    EXPECT_EQ( lm.getLogicalColumn( 2, 2 ), 12U );
+    // Third segment (continuation): col 4 is really byte 24.
+    EXPECT_EQ( lm.getLogicalColumn( 3, 4 ), 24U );
+    // A real line that does not wrap is unaffected.
+    EXPECT_EQ( lm.getLogicalColumn( 4, 1 ), 1U );
+}
+
+TEST( LineManagerTest, LogicalNumbersSurviveCacheInvalidation )
+{
+    PieceTable pt;
+    pt.insert( 0, "ABCDEFGHIJKLMNOPQRSTUVWXY\ntail" );  // wrapped long line then a real line
+
+    LineManager lm( &pt, /*max_visual_line_length=*/10 );
+    ASSERT_EQ( lm.getLogicalLineNumber( 3 ), 2 );  // force full calculation ("tail")
+
+    // Invalidating inside the wrapped region must drop and correctly rebuild the logical mapping.
+    lm.invalidateCacheFromOffset( 5 );
+    EXPECT_TRUE( lm.isLogicalLineStart( 0 ) );
+    EXPECT_FALSE( lm.isLogicalLineStart( 1 ) );
+    EXPECT_FALSE( lm.isLogicalLineStart( 2 ) );
+    EXPECT_TRUE( lm.isLogicalLineStart( 3 ) );
+    EXPECT_EQ( lm.getLogicalLineNumber( 3 ), 2 );
+}
+
 TEST( LineManagerTest, CacheInvalidation )
 {
     PieceTable pt;

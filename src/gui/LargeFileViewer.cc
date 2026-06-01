@@ -232,6 +232,19 @@ auto LargeFileViewer::setPieceTable( PieceTable* pieceTable ) -> void
     viewport()->update();
 }
 
+auto LargeFileViewer::emitCursorPosition() -> void
+{
+    int vline = cursor_->line();
+    int col = cursor_->col();
+    if( !line_manager_ ) {
+        emit cursorPositionChanged( vline, col );
+        return;
+    }
+    int logicalLine = line_manager_->getLogicalLineNumber( vline ) - 1;
+    int logicalCol = static_cast<int>( line_manager_->getLogicalColumn( vline, col ) );
+    emit cursorPositionChanged( logicalLine, logicalCol );
+}
+
 auto LargeFileViewer::setCursorPosition( int line, int col ) -> void
 {
     if( piece_table_ == nullptr || !line_manager_ ) {
@@ -244,7 +257,7 @@ auto LargeFileViewer::setCursorPosition( int line, int col ) -> void
     cursor_->setVisible( true );
     scrollToCursor();
     viewport()->update();
-    emit cursorPositionChanged( cursor_->line(), cursor_->col() );
+    emitCursorPosition();
 }
 
 auto LargeFileViewer::scrollToCursor() -> void
@@ -288,7 +301,7 @@ auto LargeFileViewer::keyPressEvent( QKeyEvent* event ) -> void
     refreshLineOffsets();
     viewport()->update();
 
-    emit cursorPositionChanged( cursor_->line(), cursor_->col() );
+    emitCursorPosition();
 
     line_offset_timer_->start( kLineOffsetDelayMs );
 }
@@ -328,7 +341,7 @@ auto LargeFileViewer::mousePressEvent( QMouseEvent* event ) -> void
     cursor_->setVisible( true );
     viewport()->update();
 
-    emit cursorPositionChanged( cursor_->line(), cursor_->col() );
+    emitCursorPosition();
 }
 
 auto LargeFileViewer::paintViewport( QPaintEvent* event ) -> void
