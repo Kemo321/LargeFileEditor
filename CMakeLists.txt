@@ -71,20 +71,7 @@ add_executable(LargeFileEditor ${SOURCES})
 target_link_libraries(LargeFileEditor PRIVATE Qt6::Core Qt6::Widgets
                                               Qt6::Concurrent)
 
-set(INSTALL_GTEST
-    OFF
-    CACHE BOOL "" FORCE)
-
-if(EXISTS "${CMAKE_SOURCE_DIR}/extern/googletest/CMakeLists.txt")
-  add_subdirectory(extern/googletest)
-else()
-  include(FetchContent)
-  FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.14.0)
-  FetchContent_MakeAvailable(googletest)
-endif()
+find_package(GTest REQUIRED)
 
 enable_testing()
 add_subdirectory(tests)
