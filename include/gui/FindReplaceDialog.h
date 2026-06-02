@@ -39,6 +39,11 @@ public:
      */
     auto showReplace() -> void;
 
+    /**
+     * @brief Enables/disables the action buttons while a background operation runs.
+     */
+    auto setActionsEnabled( bool enabled ) -> void;
+
 signals:
     /// Requests finding the next occurrence of @p text.
     auto findNextRequested( const QString& text, bool matchCase, bool matchWord ) -> void;
@@ -75,4 +80,9 @@ private:
     QLineEdit* replace_input_{};
     QCheckBox* match_case_2_{};
     QCheckBox* match_word_2_{};
+
+    QPushButton* find_next_button_1_{};
+    QPushButton* find_next_button_2_{};
+    QPushButton* replace_button_{};
+    QPushButton* replace_all_button_{};
 };

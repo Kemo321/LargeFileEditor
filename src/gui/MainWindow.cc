@@ -57,6 +57,7 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
         viewer_->setEnabled( true );
         viewer_->setSearchHighlights( {}, -1, 0 );
         task_progress_bar_->hide();
+        find_replace_dialog_->setActionsEnabled( true );
         task_status_label_->setText( "Gotowy" );
     } );
 
@@ -508,6 +509,7 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
         task_status_label_->setText( "Wyszukiwanie..." );
 
         viewer_->setEnabled( false );
+        find_replace_dialog_->setActionsEnabled( false );
 
         tasks_->startFind( piece_table_.get(), text, matchCase, matchWord );
     } else {
@@ -519,6 +521,7 @@ auto MainWindow::onFindFinished( std::vector<uint64_t> results ) -> void
 {
     task_progress_bar_->hide();
     viewer_->setEnabled( true );
+    find_replace_dialog_->setActionsEnabled( true );
     current_find_results_ = std::move( results );
     current_find_index_ = -1;
     processFindResults();
@@ -598,6 +601,7 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
     viewer_->setBusy( true );  // worker owns the PieceTable; viewer must not read it
     save_act_->setEnabled( false );
     open_act_->setEnabled( false );
+    find_replace_dialog_->setActionsEnabled( false );
 
     task_progress_bar_->show();
     task_progress_bar_->setRange( 0, 100 );
@@ -614,6 +618,7 @@ auto MainWindow::onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -
     viewer_->setBusy( false );  // re-enable rendering before any paint
     save_act_->setEnabled( true );
     open_act_->setEnabled( true );
+    find_replace_dialog_->setActionsEnabled( true );
 
     current_find_results_.clear();
     current_find_index_ = -1;
