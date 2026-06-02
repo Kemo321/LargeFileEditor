@@ -299,8 +299,8 @@ auto LineManager::getGlobalMaxLineLength() const -> uint64_t
     return global_max_line_length_;
 }
 
-auto LineManager::getLineChunk( int virtual_line, uint64_t start_col,
-                                uint64_t length ) -> std::string
+auto LineManager::getLineChunk( int virtual_line, uint64_t start_col, uint64_t length )
+    -> std::string
 {
     uint64_t line_len = getVirtualLineLength( virtual_line );
     if( start_col >= line_len ) {
