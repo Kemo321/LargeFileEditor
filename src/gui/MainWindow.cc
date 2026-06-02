@@ -643,6 +643,7 @@ auto MainWindow::onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -
             QString( "Pomyślnie zamieniono %1 wystąpień" ).arg( replaced ) );
     } else {
         task_status_label_->setText( "Zamień wszystko: brak dopasowań" );
-        QMessageBox::information( this, "Zamień wszystko", "Nie znaleziono tekstu." );
+        QMessageBox::information( find_replace_dialog_, "Zamień wszystko",
+                                  "Nie znaleziono tekstu." );
     }
 }
