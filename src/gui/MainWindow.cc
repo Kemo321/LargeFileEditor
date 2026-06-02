@@ -51,7 +51,9 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
         current_find_text_ = "";
         current_match_case_ = true;
         current_match_word_ = false;
+        viewer_->setEnabled( true );
         viewer_->setSearchHighlights( {}, -1, 0 );
+        task_progress_bar_->hide();
         task_status_label_->setText( "Gotowy" );
     } );
 
@@ -513,6 +515,7 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
         task_status_label_->setText( "Wyszukiwanie..." );
 
         viewer_->setEnabled( false );
+        find_replace_dialog_->setFindInProgress( true );
 
         tasks_->startFind( piece_table_.get(), text, matchCase, matchWord );
     } else {
@@ -524,6 +527,7 @@ auto MainWindow::onFindFinished( std::vector<uint64_t> results ) -> void
 {
     task_progress_bar_->hide();
     viewer_->setEnabled( true );
+    find_replace_dialog_->setFindInProgress( false );
     current_find_results_ = std::move( results );
     current_find_index_ = -1;
     processFindResults();

@@ -4,6 +4,7 @@
 
 #include <QHBoxLayout>
 #include <QHideEvent>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QVBoxLayout>
@@ -40,6 +41,26 @@ auto FindReplaceDialog::showReplace() -> void
     show();
     raise();
     activateWindow();
+}
+
+auto FindReplaceDialog::setFindInProgress( bool inProgress ) -> void
+{
+    find_in_progress_ = inProgress;
+    if( close_button_1_ != nullptr ) {
+        close_button_1_->setEnabled( !inProgress );
+    }
+    if( close_button_2_ != nullptr ) {
+        close_button_2_->setEnabled( !inProgress );
+    }
+}
+
+auto FindReplaceDialog::keyPressEvent( QKeyEvent* event ) -> void
+{
+    if( find_in_progress_ && event->key() == Qt::Key_Escape ) {
+        event->ignore();
+        return;
+    }
+    QDialog::keyPressEvent( event );
 }
 
 auto FindReplaceDialog::hideEvent( QHideEvent* event ) -> void
@@ -80,10 +101,10 @@ auto FindReplaceDialog::setupUi() -> void
     auto* findButtonLayout = new QHBoxLayout();
     findButtonLayout->addStretch();
     auto* btnFindNext1 = new QPushButton( "Znajdź następny" );
-    auto* btnClose1 = new QPushButton( "Zamknij" );
+    close_button_1_ = new QPushButton( "Zamknij" );
     findButtonLayout->addWidget( btnFindNext1 );
-    findButtonLayout->addWidget( btnClose1 );
-    connect( btnClose1, &QPushButton::clicked, this, &QDialog::hide );
+    findButtonLayout->addWidget( close_button_1_ );
+    connect( close_button_1_, &QPushButton::clicked, this, &QDialog::hide );
 
     connect( btnFindNext1, &QPushButton::clicked, this, [this]() {
         emit findNextRequested( find_input_1_->text(), match_case_1_->isChecked(),
@@ -117,13 +138,13 @@ auto FindReplaceDialog::setupUi() -> void
     auto* btnFindNext2 = new QPushButton( "Znajdź następny" );
     auto* btnReplace = new QPushButton( "Zamień" );
     auto* btnReplaceAll = new QPushButton( "Zamień wszystko" );
-    auto* btnClose2 = new QPushButton( "Zamknij" );
+    close_button_2_ = new QPushButton( "Zamknij" );
     replaceButtonLayout->addWidget( btnFindNext2 );
     replaceButtonLayout->addWidget( btnReplace );
     replaceButtonLayout->addWidget( btnReplaceAll );
-    replaceButtonLayout->addWidget( btnClose2 );
+    replaceButtonLayout->addWidget( close_button_2_ );
 
-    connect( btnClose2, &QPushButton::clicked, this, &QDialog::hide );
+    connect( close_button_2_, &QPushButton::clicked, this, &QDialog::hide );
 
     connect( btnFindNext2, &QPushButton::clicked, this, [this]() {
         emit findNextRequested( find_input_2_->text(), match_case_2_->isChecked(),
