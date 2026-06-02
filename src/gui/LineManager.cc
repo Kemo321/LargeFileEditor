@@ -120,7 +120,8 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
                 global_max_line_length_ = new_len;
             }
 
-            // Only cache a new virtual-line start for a genuine break;if( should_push_new_line ) {
+            // Only cache a new virtual-line start for a genuine break;
+            if( should_push_new_line ) {
                 // The new virtual line starts a fresh logical line only if the segment that just
                 // ended was terminated by '\n'; a hard-wrap continuation keeps the previous number.
                 int prev_logical = logical_line_numbers_.back();
