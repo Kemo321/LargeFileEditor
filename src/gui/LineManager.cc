@@ -194,10 +194,24 @@ auto LineManager::getLineCount() -> int
 {
     uint64_t file_size = pt_->size();
 
-    std::lock_guard<std::mutex> lock( cache_mutex_ );
-    if( line_start_offsets_.empty() ) {
-        return 1;
+    uint64_t scanned_bytes = 0;
+    {
+        std::lock_guard<std::mutex> lock( cache_mutex_ );
+        if( line_start_offsets_.empty() ) {
+            return 1;
+        }
+        if( calculated_up_to_ >= file_size ) {
+            return static_cast<int>( line_start_offsets_.size() );
+        }
+        scanned_bytes = calculated_up_to_;
     }
+
+    const uint64_t kExactCountTailBytes = 1024 * 1024;
+    if( file_size - scanned_bytes <= kExactCountTailBytes ) {
+        ensureOffsetCalculated( file_size );
+    }
+
+    std::lock_guard<std::mutex> lock( cache_mutex_ );
     if( calculated_up_to_ >= file_size ) {
         return static_cast<int>( line_start_offsets_.size() );
     }
