@@ -135,9 +135,13 @@ auto prepareLine( LineDrawContext& lc, int idx ) -> void
     }
 
     if( lc.chunkStartByte_ > 0 ) {
-        uint64_t snapped = Utf8Utils::snapToCharacterBoundary( lc.byteAt_, lc.lineStart_,
-                                                               lc.lineStart_ + lc.chunkStartByte_ );
-        lc.chunkStartByte_ = snapped - lc.lineStart_;
+        uint64_t targetPos = lc.lineStart_ + lc.chunkStartByte_;
+
+        if( targetPos < ctx.pieceTable_->size() ) {
+            uint64_t snapped =
+                Utf8Utils::snapToCharacterBoundary( lc.byteAt_, lc.lineStart_, targetPos );
+            lc.chunkStartByte_ = snapped - lc.lineStart_;
+        }
     }
 
     lc.textX_ = lc.gutterWidth_ + editor_layout::kGutterTextPadding - lc.pxOffset_;
