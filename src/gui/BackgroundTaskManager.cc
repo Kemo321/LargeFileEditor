@@ -36,10 +36,21 @@ auto BackgroundTaskManager::startSave( PieceTable* table, const QString& tempPat
 auto BackgroundTaskManager::startFind( PieceTable* table, const QString& text, bool matchCase,
                                        bool matchWord ) -> void
 {
-    QFuture<std::vector<uint64_t>> future =
-        QtConcurrent::run( [table, text, matchCase, matchWord]() {
-            return table->findAll( text.toStdString(), matchCase, matchWord );
+    find_canceled_ = false;
+
+    const std::string pat = text.toStdString();
+
+    QFuture<std::vector<uint64_t>> future = QtConcurrent::run(
+        [table, pat, matchCase, matchWord]( QPromise<std::vector<uint64_t>>& promise ) {
+            std::atomic<bool> cancel{ false };
+            auto progress = [&promise, &cancel]( uint64_t, uint64_t ) {
+                if( promise.isCanceled() ) {
+                    cancel.store( true );
+                }
+            };
+            promise.addResult( table->findAll( pat, matchCase, matchWord, progress, cancel ) );
         } );
+
     find_watcher_->setFuture( future );
 }
 
@@ -83,6 +94,14 @@ auto BackgroundTaskManager::isReplaceRunning() const -> bool
     return ( replace_watcher_ != nullptr ) && replace_watcher_->isRunning();
 }
 
+auto BackgroundTaskManager::cancelFind() -> void
+{
+    if( isFindRunning() ) {
+        find_canceled_ = true;
+        find_watcher_->future().cancel();
+    }
+}
+
 auto BackgroundTaskManager::cancelReplace() -> void
 {
     if( isReplaceRunning() ) {
@@ -95,6 +114,15 @@ auto BackgroundTaskManager::waitForSave() -> void
 {
     if( isSaveRunning() ) {
         save_watcher_->waitForFinished();
+    }
+}
+
+auto BackgroundTaskManager::waitForFind() -> void
+{
+    if( isFindRunning() ) {
+        find_canceled_ = true;
+        find_watcher_->future().cancel();
+        find_watcher_->waitForFinished();
     }
 }
 
@@ -113,10 +141,17 @@ auto BackgroundTaskManager::onSaveFinished() -> void
 
 auto BackgroundTaskManager::onFindFinished() -> void
 {
+    if( find_canceled_ || find_watcher_->future().isCanceled() ) {
+        return;
+    }
     emit this->findFinished( find_watcher_->result() );
 }
 
 auto BackgroundTaskManager::onReplaceFinished() -> void
 {
-    emit this->replaceFinished( replace_watcher_->result(), replace_canceled_ );
+    if( replace_canceled_ || replace_watcher_->future().isCanceled() ) {
+        emit this->replaceFinished( 0, true );
+        return;
+    }
+    emit this->replaceFinished( replace_watcher_->result(), false );
 }

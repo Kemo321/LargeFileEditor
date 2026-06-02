@@ -116,6 +116,22 @@ public:
                                 bool matchWord = false ) const -> std::vector<uint64_t>;
 
     /**
+     * @brief Finds all logical positions of a substring, with progress and cancellation.
+     *
+     * The scan polls @p cancel cooperatively and returns an empty vector if canceled mid-scan.
+     *
+     * @param pattern The string to search for.
+     * @param matchCase True if search is case-sensitive.
+     * @param matchWord True if search matches whole words.
+     * @param progress Callback invoked periodically with (bytesScanned, totalBytes).
+     * @param cancel Polled cooperatively; when true the search aborts and returns empty.
+     * @return Vector of starting byte positions, or empty if canceled.
+     */
+    [[nodiscard]] auto findAll( const std::string& pattern, bool matchCase, bool matchWord,
+                                const std::function<void( uint64_t, uint64_t )>& progress,
+                                const std::atomic<bool>& cancel ) const -> std::vector<uint64_t>;
+
+    /**
      * @brief Retrieves a specific substring.
      * @param position Starting logical byte position.
      * @param length Number of bytes to retrieve.

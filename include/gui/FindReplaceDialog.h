@@ -40,9 +40,9 @@ public:
     auto showReplace() -> void;
 
     /**
-     * @brief Locks the dialog open while a (non-abortable) search runs.
+     * @brief Enables/disables the action buttons while a background operation runs.
      */
-    auto setFindInProgress( bool inProgress ) -> void;
+    auto setActionsEnabled( bool enabled ) -> void;
 
 signals:
     /// Requests finding the next occurrence of @p text.
@@ -66,8 +66,6 @@ protected:
     auto hideEvent( QHideEvent* event ) -> void override;
     /// Starts a frameless-window drag on left-button press.
     auto mousePressEvent( QMouseEvent* event ) -> void override;
-    /// Swallows the Escape key while a search is running so the dialog cannot be dismissed.
-    auto keyPressEvent( QKeyEvent* event ) -> void override;
 
 private:
     auto setupUi() -> void;
@@ -83,7 +81,8 @@ private:
     QCheckBox* match_case_2_{};
     QCheckBox* match_word_2_{};
 
-    QPushButton* close_button_1_{};
-    QPushButton* close_button_2_{};
-    bool find_in_progress_{ false };
+    QPushButton* find_next_button_1_{};
+    QPushButton* find_next_button_2_{};
+    QPushButton* replace_button_{};
+    QPushButton* replace_all_button_{};
 };

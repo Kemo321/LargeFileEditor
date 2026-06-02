@@ -4,7 +4,6 @@
 
 #include <QHBoxLayout>
 #include <QHideEvent>
-#include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QVBoxLayout>
@@ -43,24 +42,14 @@ auto FindReplaceDialog::showReplace() -> void
     activateWindow();
 }
 
-auto FindReplaceDialog::setFindInProgress( bool inProgress ) -> void
+auto FindReplaceDialog::setActionsEnabled( bool enabled ) -> void
 {
-    find_in_progress_ = inProgress;
-    if( close_button_1_ != nullptr ) {
-        close_button_1_->setEnabled( !inProgress );
+    for( QPushButton* button :
+         { find_next_button_1_, find_next_button_2_, replace_button_, replace_all_button_ } ) {
+        if( button != nullptr ) {
+            button->setEnabled( enabled );
+        }
     }
-    if( close_button_2_ != nullptr ) {
-        close_button_2_->setEnabled( !inProgress );
-    }
-}
-
-auto FindReplaceDialog::keyPressEvent( QKeyEvent* event ) -> void
-{
-    if( find_in_progress_ && event->key() == Qt::Key_Escape ) {
-        event->ignore();
-        return;
-    }
-    QDialog::keyPressEvent( event );
 }
 
 auto FindReplaceDialog::hideEvent( QHideEvent* event ) -> void
@@ -100,13 +89,13 @@ auto FindReplaceDialog::setupUi() -> void
 
     auto* findButtonLayout = new QHBoxLayout();
     findButtonLayout->addStretch();
-    auto* btnFindNext1 = new QPushButton( "Znajdź następny" );
-    close_button_1_ = new QPushButton( "Zamknij" );
-    findButtonLayout->addWidget( btnFindNext1 );
-    findButtonLayout->addWidget( close_button_1_ );
-    connect( close_button_1_, &QPushButton::clicked, this, &QDialog::hide );
+    find_next_button_1_ = new QPushButton( "Znajdź następny" );
+    auto* btnClose1 = new QPushButton( "Zamknij" );
+    findButtonLayout->addWidget( find_next_button_1_ );
+    findButtonLayout->addWidget( btnClose1 );
+    connect( btnClose1, &QPushButton::clicked, this, &QDialog::hide );
 
-    connect( btnFindNext1, &QPushButton::clicked, this, [this]() {
+    connect( find_next_button_1_, &QPushButton::clicked, this, [this]() {
         emit findNextRequested( find_input_1_->text(), match_case_1_->isChecked(),
                                 match_word_1_->isChecked() );
     } );
@@ -135,26 +124,26 @@ auto FindReplaceDialog::setupUi() -> void
 
     auto* replaceButtonLayout = new QHBoxLayout();
     replaceButtonLayout->addStretch();
-    auto* btnFindNext2 = new QPushButton( "Znajdź następny" );
-    auto* btnReplace = new QPushButton( "Zamień" );
-    auto* btnReplaceAll = new QPushButton( "Zamień wszystko" );
-    close_button_2_ = new QPushButton( "Zamknij" );
-    replaceButtonLayout->addWidget( btnFindNext2 );
-    replaceButtonLayout->addWidget( btnReplace );
-    replaceButtonLayout->addWidget( btnReplaceAll );
-    replaceButtonLayout->addWidget( close_button_2_ );
+    find_next_button_2_ = new QPushButton( "Znajdź następny" );
+    replace_button_ = new QPushButton( "Zamień" );
+    replace_all_button_ = new QPushButton( "Zamień wszystko" );
+    auto* btnClose2 = new QPushButton( "Zamknij" );
+    replaceButtonLayout->addWidget( find_next_button_2_ );
+    replaceButtonLayout->addWidget( replace_button_ );
+    replaceButtonLayout->addWidget( replace_all_button_ );
+    replaceButtonLayout->addWidget( btnClose2 );
 
-    connect( close_button_2_, &QPushButton::clicked, this, &QDialog::hide );
+    connect( btnClose2, &QPushButton::clicked, this, &QDialog::hide );
 
-    connect( btnFindNext2, &QPushButton::clicked, this, [this]() {
+    connect( find_next_button_2_, &QPushButton::clicked, this, [this]() {
         emit findNextRequested( find_input_2_->text(), match_case_2_->isChecked(),
                                 match_word_2_->isChecked() );
     } );
-    connect( btnReplace, &QPushButton::clicked, this, [this]() {
+    connect( replace_button_, &QPushButton::clicked, this, [this]() {
         emit replaceNextRequested( find_input_2_->text(), replace_input_->text(),
                                    match_case_2_->isChecked(), match_word_2_->isChecked() );
     } );
-    connect( btnReplaceAll, &QPushButton::clicked, this, [this]() {
+    connect( replace_all_button_, &QPushButton::clicked, this, [this]() {
         emit replaceAllRequested( find_input_2_->text(), replace_input_->text(),
                                   match_case_2_->isChecked(), match_word_2_->isChecked() );
     } );
