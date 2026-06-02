@@ -48,11 +48,17 @@ public:
     /// True while a background Replace All is running.
     [[nodiscard]] auto isReplaceRunning() const -> bool;
 
+    /// Requests cancellation of a running search; the canceled task emits no @ref findFinished.
+    auto cancelFind() -> void;
+
     /// Requests cancellation of a running Replace All (flag delivered via @ref replaceFinished).
     auto cancelReplace() -> void;
 
     /// Blocks until a running save completes (no-op otherwise).
     auto waitForSave() -> void;
+
+    /// Cancels and blocks until a running search completes (no-op otherwise).
+    auto waitForFind() -> void;
 
     /// Cancels and blocks until a running Replace All completes (no-op otherwise).
     auto waitForReplace() -> void;
@@ -79,5 +85,6 @@ private:
     QFutureWatcher<std::vector<uint64_t>>* find_watcher_{ nullptr };
     QFutureWatcher<uint64_t>* replace_watcher_{ nullptr };
 
+    bool find_canceled_{ false };
     bool replace_canceled_{ false };
 };

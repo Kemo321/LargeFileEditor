@@ -87,7 +87,6 @@ private:
     QLabel* cursor_pos_label_{};
     QProgressBar* task_progress_bar_{};
     QLabel* task_status_label_{};
-    QPushButton* cancel_task_btn_{};
 
     QAction* open_act_{};
     QAction* save_act_{};

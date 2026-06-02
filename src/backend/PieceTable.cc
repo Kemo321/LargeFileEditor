@@ -225,8 +225,15 @@ auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool match
     -> std::vector<uint64_t>
 {
     static const std::atomic<bool> never{ false };
-    return findAllImpl(
+    return findAll(
         pattern, matchCase, matchWord, []( uint64_t, uint64_t ) {}, never );
+}
+
+auto PieceTable::findAll( const std::string& pattern, bool matchCase, bool matchWord,
+                          const std::function<void( uint64_t, uint64_t )>& progress,
+                          const std::atomic<bool>& cancel ) const -> std::vector<uint64_t>
+{
+    return findAllImpl( pattern, matchCase, matchWord, progress, cancel );
 }
 
 auto PieceTable::findAllImpl( const std::string& pattern, bool matchCase, bool matchWord,

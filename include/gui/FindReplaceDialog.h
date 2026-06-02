@@ -39,11 +39,6 @@ public:
      */
     auto showReplace() -> void;
 
-    /**
-     * @brief Locks the dialog open while a (non-abortable) search runs.
-     */
-    auto setFindInProgress( bool inProgress ) -> void;
-
 signals:
     /// Requests finding the next occurrence of @p text.
     auto findNextRequested( const QString& text, bool matchCase, bool matchWord ) -> void;
@@ -66,8 +61,6 @@ protected:
     auto hideEvent( QHideEvent* event ) -> void override;
     /// Starts a frameless-window drag on left-button press.
     auto mousePressEvent( QMouseEvent* event ) -> void override;
-    /// Swallows the Escape key while a search is running so the dialog cannot be dismissed.
-    auto keyPressEvent( QKeyEvent* event ) -> void override;
 
 private:
     auto setupUi() -> void;
@@ -82,8 +75,4 @@ private:
     QLineEdit* replace_input_{};
     QCheckBox* match_case_2_{};
     QCheckBox* match_word_2_{};
-
-    QPushButton* close_button_1_{};
-    QPushButton* close_button_2_{};
-    bool find_in_progress_{ false };
 };

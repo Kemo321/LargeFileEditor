@@ -43,6 +43,9 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     connect( find_replace_dialog_, &FindReplaceDialog::replaceAllRequested, this,
              &MainWindow::onReplaceAllRequested );
     connect( find_replace_dialog_, &FindReplaceDialog::dialogClosed, this, [this]() {
+        if( tasks_->isFindRunning() ) {
+            tasks_->cancelFind();
+        }
         if( tasks_->isReplaceRunning() ) {
             tasks_->cancelReplace();
         }
@@ -69,13 +72,6 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
     connect( tasks_, &BackgroundTaskManager::replaceFinished, this,
              &MainWindow::onReplaceAllFinished );
 
-    connect( cancel_task_btn_, &QPushButton::clicked, this, [this]() {
-        if( tasks_->isReplaceRunning() ) {
-            tasks_->cancelReplace();
-            task_status_label_->setText( "Anulowanie..." );
-        }
-    } );
-
     connect( viewer_, &LargeFileViewer::cursorPositionChanged, this, [this]( int line, int col ) {
         cursor_pos_label_->setText( QString( "Wiersz %1, Kol %2" ).arg( line + 1 ).arg( col + 1 ) );
     } );
@@ -92,6 +88,7 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
 
 MainWindow::~MainWindow()
 {
+    tasks_->waitForFind();  // a search scans the mmap'd PieceTable; join it before the table dies
     tasks_->waitForReplace();
     tasks_->waitForSave();
 }
@@ -230,14 +227,10 @@ auto MainWindow::createStatusBar() -> void
     task_progress_bar_->setMaximumHeight( kProgressBarHeight );
     task_progress_bar_->hide();
 
-    cancel_task_btn_ = new QPushButton( "Anuluj", this );
-    cancel_task_btn_->hide();
-
     task_status_label_ = new QLabel( "Gotowy", this );
 
     statusBar()->addWidget( task_status_label_ );
     statusBar()->addWidget( task_progress_bar_ );
-    statusBar()->addWidget( cancel_task_btn_ );
 
     cursor_pos_label_ = new QLabel( "Wiersz 1, Kol 1", this );
     statusBar()->addPermanentWidget( cursor_pos_label_ );
@@ -515,7 +508,6 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
         task_status_label_->setText( "Wyszukiwanie..." );
 
         viewer_->setEnabled( false );
-        find_replace_dialog_->setFindInProgress( true );
 
         tasks_->startFind( piece_table_.get(), text, matchCase, matchWord );
     } else {
@@ -527,7 +519,6 @@ auto MainWindow::onFindFinished( std::vector<uint64_t> results ) -> void
 {
     task_progress_bar_->hide();
     viewer_->setEnabled( true );
-    find_replace_dialog_->setFindInProgress( false );
     current_find_results_ = std::move( results );
     current_find_index_ = -1;
     processFindResults();
@@ -611,7 +602,6 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
     task_progress_bar_->show();
     task_progress_bar_->setRange( 0, 100 );
     task_progress_bar_->setValue( 0 );
-    cancel_task_btn_->show();
     task_status_label_->setText( "Zamienianie..." );
 
     tasks_->startReplaceAll( piece_table_.get(), findText, replaceText, matchCase, matchWord );
@@ -620,7 +610,6 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
 auto MainWindow::onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -> void
 {
     task_progress_bar_->hide();
-    cancel_task_btn_->hide();
     viewer_->setEnabled( true );
     viewer_->setBusy( false );  // re-enable rendering before any paint
     save_act_->setEnabled( true );
