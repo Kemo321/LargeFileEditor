@@ -58,6 +58,7 @@ MainWindow::MainWindow( QWidget* parent ) : QMainWindow( parent ), current_filen
         viewer_->setSearchHighlights( {}, -1, 0 );
         task_progress_bar_->hide();
         find_replace_dialog_->setActionsEnabled( true );
+        setMenuActionsEnabled( true );
         task_status_label_->setText( "Gotowy" );
     } );
 
@@ -288,6 +289,21 @@ auto MainWindow::updateUndoRedoState() -> void
     }
 }
 
+auto MainWindow::setMenuActionsEnabled( bool enabled ) -> void
+{
+    for( QAction* action : { open_act_, save_act_, save_as_act_, find_act_, replace_act_,
+                             font_small_act_, font_medium_act_, font_large_act_ } ) {
+        action->setEnabled( enabled );
+    }
+
+    if( enabled ) {
+        updateUndoRedoState();  // restore undo/redo per backend history
+    } else {
+        undo_act_->setEnabled( false );
+        redo_act_->setEnabled( false );
+    }
+}
+
 auto MainWindow::setFontSizeSmall() -> void
 {
     viewer_->setFont( QFont( viewer_->font().family(), kFontSizeSmall ) );
@@ -314,54 +330,63 @@ auto MainWindow::openFile() -> void
     QString fileName =
         QFileDialog::getOpenFileName( this, "Otwórz plik", "", "Wszystkie pliki (*)" );
     if( !fileName.isEmpty() ) {
-        task_status_label_->setText( "Otwieranie pliku..." );
-        task_progress_bar_->show();
-        task_progress_bar_->setRange( 0, 0 );
+        loadFile( fileName );
+    }
+}
 
-        if( FileUtils::isBinaryFile( fileName ) ) {
-            task_progress_bar_->hide();
-            task_status_label_->setText( "Nieobsługiwany typ pliku: binarny" );
-            QMessageBox::warning( this, "Nieobsługiwany plik",
-                                  "Nieobsługiwany typ pliku: pliki binarne nie są obsługiwane." );
-            current_filename_ = "";
-            current_find_text_ = "";
-            current_find_index_ = -1;
-            current_find_results_.clear();
-            current_match_case_ = true;
-            current_match_word_ = false;
-            piece_table_ = nullptr;
-            viewer_->setPieceTable( nullptr );
-            viewer_->setEnabled( false );
-            setWindowModified( false );
-            updateWindowTitle();
-            updateUndoRedoState();
-            return;
-        }
+auto MainWindow::loadFile( const QString& fileName ) -> void
+{
+    if( tasks_->isReplaceRunning() ) {
+        return;
+    }
 
-        current_filename_ = fileName;
+    task_status_label_->setText( "Otwieranie pliku..." );
+    task_progress_bar_->show();
+    task_progress_bar_->setRange( 0, 0 );
+
+    if( FileUtils::isBinaryFile( fileName ) ) {
+        task_progress_bar_->hide();
+        task_status_label_->setText( "Nieobsługiwany typ pliku: binarny" );
+        QMessageBox::warning( this, "Nieobsługiwany plik",
+                              "Nieobsługiwany typ pliku: pliki binarne nie są obsługiwane." );
+        current_filename_ = "";
         current_find_text_ = "";
         current_find_index_ = -1;
         current_find_results_.clear();
         current_match_case_ = true;
         current_match_word_ = false;
-
-        try {
-            piece_table_ = std::make_unique<PieceTable>( fileName.toStdString() );
-            viewer_->setPieceTable( piece_table_.get() );
-            viewer_->setEnabled( true );
-            viewer_->setMockHighlights( QStringList{} );
-            setWindowModified( false );
-            updateWindowTitle();
-            task_status_label_->setText(
-                QString( "Wczytano: %1" ).arg( QFileInfo( fileName ).fileName() ) );
-            updateUndoRedoState();
-        } catch( ... ) {
-            task_status_label_->setText( "Błąd: nie udało się otworzyć pliku" );
-            QMessageBox::critical( this, "Błąd", "Nie można otworzyć pliku." );
-        }
-
-        task_progress_bar_->hide();
+        piece_table_ = nullptr;
+        viewer_->setPieceTable( nullptr );
+        viewer_->setEnabled( false );
+        setWindowModified( false );
+        updateWindowTitle();
+        updateUndoRedoState();
+        return;
     }
+
+    current_filename_ = fileName;
+    current_find_text_ = "";
+    current_find_index_ = -1;
+    current_find_results_.clear();
+    current_match_case_ = true;
+    current_match_word_ = false;
+
+    try {
+        piece_table_ = std::make_unique<PieceTable>( fileName.toStdString() );
+        viewer_->setPieceTable( piece_table_.get() );
+        viewer_->setEnabled( true );
+        viewer_->setMockHighlights( QStringList{} );
+        setWindowModified( false );
+        updateWindowTitle();
+        task_status_label_->setText(
+            QString( "Wczytano: %1" ).arg( QFileInfo( fileName ).fileName() ) );
+        updateUndoRedoState();
+    } catch( ... ) {
+        task_status_label_->setText( "Błąd: nie udało się otworzyć pliku" );
+        QMessageBox::critical( this, "Błąd", "Nie można otworzyć pliku." );
+    }
+
+    task_progress_bar_->hide();
 }
 
 auto MainWindow::saveFile() -> void
@@ -510,6 +535,7 @@ auto MainWindow::onFindNextRequested( const QString& text, bool matchCase, bool 
 
         viewer_->setEnabled( false );
         find_replace_dialog_->setActionsEnabled( false );
+        setMenuActionsEnabled( false );
 
         tasks_->startFind( piece_table_.get(), text, matchCase, matchWord );
     } else {
@@ -522,6 +548,7 @@ auto MainWindow::onFindFinished( std::vector<uint64_t> results ) -> void
     task_progress_bar_->hide();
     viewer_->setEnabled( true );
     find_replace_dialog_->setActionsEnabled( true );
+    setMenuActionsEnabled( true );
     current_find_results_ = std::move( results );
     current_find_index_ = -1;
     processFindResults();
@@ -599,8 +626,7 @@ auto MainWindow::onReplaceAllRequested( const QString& findText, const QString& 
 
     viewer_->setEnabled( false );
     viewer_->setBusy( true );  // worker owns the PieceTable; viewer must not read it
-    save_act_->setEnabled( false );
-    open_act_->setEnabled( false );
+    setMenuActionsEnabled( false );
     find_replace_dialog_->setActionsEnabled( false );
 
     task_progress_bar_->show();
@@ -616,8 +642,7 @@ auto MainWindow::onReplaceAllFinished( uint64_t replacedCount, bool canceled ) -
     task_progress_bar_->hide();
     viewer_->setEnabled( true );
     viewer_->setBusy( false );  // re-enable rendering before any paint
-    save_act_->setEnabled( true );
-    open_act_->setEnabled( true );
+    setMenuActionsEnabled( true );
     find_replace_dialog_->setActionsEnabled( true );
 
     current_find_results_.clear();

@@ -38,6 +38,9 @@ public:
     explicit MainWindow( QWidget* parent = nullptr );
     ~MainWindow() override;
 
+    /// Loads the given file into the editor (binary detection, error dialogs, title/status update).
+    auto loadFile( const QString& fileName ) -> void;
+
 protected:
     /// Prompts to save unsaved changes (and defers close during a running save).
     auto closeEvent( QCloseEvent* event ) -> void override;
@@ -73,6 +76,9 @@ private:
     auto redoText() -> void;
     // Syncs undo_act_/redo_act_ enabled state with backend history (disabled when no document).
     auto updateUndoRedoState() -> void;
+
+    // Locks/unlocks all menu actions while a background find/replace owns the PieceTable.
+    auto setMenuActionsEnabled( bool enabled ) -> void;
 
     // Defers window close until a running save completes; re-issued from onSaveFinished().
     auto beginCloseWait( QCloseEvent* event ) -> void;
