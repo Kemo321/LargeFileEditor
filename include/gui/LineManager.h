@@ -78,8 +78,8 @@ public:
     /**
      * @brief Gets a chunk of a line, ensuring UTF-8 boundaries.
      */
-    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col, uint64_t length )
-        -> std::string;
+    [[nodiscard]] auto getLineChunk( int virtual_line, uint64_t start_col,
+                                     uint64_t length ) -> std::string;
 
 private:
     void ensureLineCalculated( int target_line );
@@ -88,6 +88,9 @@ private:
     PieceTable* pt_;
     int max_visual_line_length_;
     uint64_t global_max_line_length_{ 0 };
+    // Max offset scanned by ensureOffsetCalculated.
+    // calculated_up_to_ == size means EOF reached without pushing a phantom trailing line.
+    uint64_t calculated_up_to_{ 0 };
 
     // Cache: virtual line index -> global byte offset
     std::vector<uint64_t> line_start_offsets_;
