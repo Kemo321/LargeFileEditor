@@ -22,6 +22,7 @@ void LineManager::reset()
     logical_line_numbers_.clear();
     logical_line_numbers_.push_back( 0 );  // virtual line 0 is always logical line 0
     global_max_line_length_ = 0;
+    calculated_up_to_ = 0;
 }
 
 void LineManager::invalidateCacheFromOffset( uint64_t offset )
@@ -41,6 +42,7 @@ void LineManager::invalidateCacheFromOffset( uint64_t offset )
         logical_line_numbers_.erase( logical_line_numbers_.begin() + kept,
                                      logical_line_numbers_.end() );
     }
+    calculated_up_to_ = line_start_offsets_.back();
 }
 
 void LineManager::ensureOffsetCalculated( uint64_t target_offset )
@@ -54,16 +56,21 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
     uint64_t current_offset = line_start_offsets_.back();
     uint64_t file_size = pt_->size();
 
-    if( current_offset >= file_size || current_offset >= target_offset ) {
+    if( current_offset > calculated_up_to_ ) {
+        calculated_up_to_ = current_offset;
+    }
+
+    if( calculated_up_to_ >= file_size || calculated_up_to_ >= target_offset ) {
         return;
     }
 
-    const uint64_t chunk_size = 64 * 1024;  // chunked to avoid large allocations
+    const uint64_t chunk_size = 64 * 1024;
 
     while( current_offset < target_offset && current_offset < file_size ) {
         uint64_t line_start = current_offset;
         uint64_t search_offset = line_start;
         bool line_ended = false;
+        bool should_push_new_line = false;
 
         while( !line_ended && search_offset < file_size ) {
             uint64_t to_fetch = std::min( chunk_size, file_size - search_offset );
@@ -74,6 +81,7 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
 
             if( max_fetch == 0 ) {
                 current_offset = search_offset;
+                should_push_new_line = true;
                 break;
             }
 
@@ -83,15 +91,18 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
             if( newline_pos != std::string::npos ) {
                 current_offset = search_offset + newline_pos + 1;  // skip the newline
                 line_ended = true;
+                should_push_new_line = true;
             } else {
                 search_offset += chunk.length();
                 if( search_offset >= file_size ) {
                     current_offset = file_size;
                     line_ended = true;
+                    should_push_new_line = false;
                 } else if( search_offset - line_start >=
                            static_cast<uint64_t>( max_visual_line_length_ ) ) {
                     current_offset = search_offset;
                     line_ended = true;
+                    should_push_new_line = true;
                 }
             }
         }
@@ -108,11 +119,20 @@ void LineManager::ensureOffsetCalculated( uint64_t target_offset )
             if( new_len > global_max_line_length_ ) {
                 global_max_line_length_ = new_len;
             }
-            // The new virtual line starts a fresh logical line only if the segment that just ended
-            // was terminated by '\n'; a hard-wrap continuation keeps the previous logical number.
-            int prev_logical = logical_line_numbers_.back();
-            logical_line_numbers_.push_back( ended_with_newline ? prev_logical + 1 : prev_logical );
-            line_start_offsets_.push_back( current_offset );
+
+            // Only cache a new virtual-line start for a genuine break;
+            if( should_push_new_line ) {
+                // The new virtual line starts a fresh logical line only if the segment that just
+                // ended was terminated by '\n'; a hard-wrap continuation keeps the previous number.
+                int prev_logical = logical_line_numbers_.back();
+                logical_line_numbers_.push_back( ended_with_newline ? prev_logical + 1
+                                                                    : prev_logical );
+                line_start_offsets_.push_back( current_offset );
+            }
+        }
+
+        if( current_offset > calculated_up_to_ ) {
+            calculated_up_to_ = current_offset;
         }
     }
 }
@@ -129,7 +149,7 @@ void LineManager::ensureLineCalculated( int target_line )
             if( target_line < static_cast<int>( line_start_offsets_.size() ) ) {
                 return;
             }
-            if( line_start_offsets_.back() >= pt_->size() ) {
+            if( calculated_up_to_ >= pt_->size() ) {
                 return;  // EOF
             }
         }
@@ -178,7 +198,7 @@ auto LineManager::getLineCount() -> int
     if( line_start_offsets_.empty() ) {
         return 1;
     }
-    if( line_start_offsets_.back() >= file_size ) {
+    if( calculated_up_to_ >= file_size ) {
         return static_cast<int>( line_start_offsets_.size() );
     }
 
